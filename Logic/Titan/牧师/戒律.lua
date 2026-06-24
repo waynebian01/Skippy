@@ -1,9 +1,9 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "牧师" then return end
-if not Skippy.state.inParty then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if Skippy.State.class ~= "牧师" then return end
+if not Skippy.State.inParty then return Skippy.UnitHeal("Skip", "Skip") end
 
 -- ===== 状态 =====
-local state = Skippy.state
+local state = Skippy.State
 local target = Skippy.Units.target
 local mana = state.power.MANA[1]
 local manaMax = state.power.MANA[2]
@@ -53,7 +53,7 @@ if InnerFocus then
         return Cast(lowestUnit, "治疗祷言")
     end
     -- 当[心灵专注]可以施放时,生命值低于75%的单位大于3个时,施放[心灵专注]
-elseif spell("心灵专注") and count75 >= 3 and not Skippy.state.inRaid then
+elseif spell("心灵专注") and count75 >= 3 and not Skippy.State.inRaid then
     return Cast("spell", "心灵专注")
 end
 -- 当[奥术洪流]可以施放,魔法值低于90%时,施放[奥术洪流]
@@ -100,7 +100,7 @@ if spell("苦修", lowestUnit) and lowestHealth < set["苦修"] then
     return Cast(lowestUnit, "苦修")
 end
 -- 当[治疗祷言]可以施放时,生命值低于75%的单位大于4个时,施放[治疗祷言]
-if spell("治疗祷言", lowestUnit) and Skippy.GetCount(80) >= 4 and not Skippy.state.inRaid then
+if spell("治疗祷言", lowestUnit) and Skippy.GetCount(80) >= 4 and not Skippy.State.inRaid then
     return Cast(lowestUnit, "治疗祷言")
 end
 -- 当[联结治疗]可以施放,玩家生命值低于75%,联结治疗生命值低于75%时,施放[联结治疗]

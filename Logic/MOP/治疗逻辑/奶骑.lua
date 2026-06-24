@@ -1,18 +1,14 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "圣骑士" or Skippy.state.specID ~= 65 then return end
-if not Skippy.state.inParty then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy then return end
 
 -- ===== 状态 =====
-local state = Skippy.state
+local state = Skippy.State
 local target = Skippy.Units.target
 local disperse = Skippy.disperse
 local targetCanAttack = target.exists and target.canAttack
 local insight = state.shapeshiftForm["洞察圣印"]
-local mana = state.power.MANA[1]
-local manaMax = state.power.MANA[2]
-local percentMana = mana / manaMax * 100
-local holyPower = state.power.HOLY_POWER[1]
-local holyPowerMax = state.power.HOLY_POWER[2]
+local percentMana = state.power.MANA.powerPercent
+local holyPower = state.power.HOLY_POWER.powerValue
+local holyPowerMax = state.power.HOLY_POWER.powerMax
 
 -- ===== 变量 =====
 local UnitHeal = Skippy.UnitHeal

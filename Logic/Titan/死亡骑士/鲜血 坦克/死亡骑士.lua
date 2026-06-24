@@ -1,8 +1,8 @@
-if not Skippy or not Skippy.Units or not Skippy.state then return end
-if Skippy.state.class ~= "死亡骑士" then return end
+if not Skippy or not Skippy.Units or not Skippy.State then return end
+if Skippy.State.class ~= "死亡骑士" then return end
 
 -- ===== 状态 =====
-local state = Skippy.state
+local state = Skippy.State
 local player = Skippy.GetPlayerInfo()
 local healthPct = player and player.percentHealth or 100
 local runic = state.power.RUNIC_POWER[1]

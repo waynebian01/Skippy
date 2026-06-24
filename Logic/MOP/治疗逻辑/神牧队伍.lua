@@ -1,18 +1,18 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "牧师" or Skippy.state.specID ~= 257 then return end
-if not Skippy.state.inParty then return end
-if not Skippy.Group or not Skippy.state.initialization then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if Skippy.State.class ~= "牧师" or Skippy.State.specID ~= 257 then return end
+if not Skippy.State.inParty then return end
+if not Skippy.Group or not Skippy.State.initialization then return Skippy.UnitHeal("Skip", "Skip") end
 
 local currentTime = GetTime()
-local state = Skippy.state
+local state = Skippy.State
 local castUnit = state.CastTargetUnit
 local group = Skippy.Group
 local playerAuras = Skippy.GetPlayerAuras
 local isKnown = Skippy.IsSpellKnown
 local spell = Skippy.GetSpellInfo
 local chakra_cooldown = aura_env.getChakraCooldown() -- 脉轮：罚, 佑, 静 ; 冷却时间
-local mana = Skippy.state.power.MANA[1]
-local manaMax = Skippy.state.power.MANA[2]
+local mana = Skippy.State.power.MANA[1]
+local manaMax = Skippy.State.power.MANA[2]
 local percentMana = mana / manaMax * 100
 local lowestUnit, lowestHealth = Skippy.GetLowestUnit()
 local lowestUnitWithoutPlayer, lowestHealthWithoutPlayer = Skippy.GetLowestUnitWithoutPlayer()

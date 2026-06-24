@@ -1,5 +1,5 @@
-if not Skippy or not Skippy.Units or not Skippy.state then return end
-if Skippy.state.class ~= "战士" or Skippy.state.specID ~= 72 then return end
+if not Skippy or not Skippy.Units or not Skippy.State then return end
+if Skippy.State.class ~= "战士" or Skippy.State.specID ~= 72 then return end
 
 local enemyCount = Skippy.GetEnemyCount(8)
 local target = Skippy.Units.target

@@ -1,9 +1,9 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "武僧" or Skippy.state.specID ~= 270 then return end
-if not Skippy.state.inParty then return end
-if not Skippy.Group or not Skippy.state.initialization then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if Skippy.State.class ~= "武僧" or Skippy.State.specID ~= 270 then return end
+if not Skippy.State.inParty then return end
+if not Skippy.Group or not Skippy.State.initialization then return Skippy.UnitHeal("Skip", "Skip") end
 
-local state = Skippy.state
+local state = Skippy.State
 local target = Skippy.Units.target
 local targetCanAttack = target.exists and target.canAttack and C_Spell.IsSpellInRange("猛虎掌", "target")
 local playerAuras = Skippy.GetPlayerAuras

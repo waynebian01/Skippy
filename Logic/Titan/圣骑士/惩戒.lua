@@ -1,8 +1,8 @@
-if not Skippy or not Skippy.Units or not Skippy.state then return end
-if Skippy.state.class ~= "圣骑士" then return end
+if not Skippy or not Skippy.Units or not Skippy.State then return end
+if Skippy.State.class ~= "圣骑士" then return end
 
 local spell = Skippy.IsUsableSpellOnUnit
-local state = Skippy.state
+local state = Skippy.State
 local mana = state.power.MANA[1]
 local manaMax = state.power.MANA[2]
 local percentMana = mana / manaMax * 100

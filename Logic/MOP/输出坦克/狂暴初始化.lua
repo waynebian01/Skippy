@@ -8,7 +8,7 @@ function aura_env.info()
     aura_env.Bloodsurge = playerAuras(46916)                                                   -- 血脉喷张
     aura_env.MeatCleaver = playerAuras(85739) and playerAuras(85739).applications or 0         -- 绞肉机
     aura_env.ColossusSmash = targetAuras(86346)                                                -- 巨人打击
-    aura_env.rage = Skippy.state.power.RAGE[1]
+    aura_env.rage = Skippy.State.power.RAGE[1]
 end
 
 function aura_env.SingleTarget()

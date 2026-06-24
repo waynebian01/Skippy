@@ -1,11 +1,11 @@
-if not Skippy or not Skippy.Units or not Skippy.state then return end
-if Skippy.state.class ~= "战士" then return end
+if not Skippy or not Skippy.Units or not Skippy.State then return end
+if Skippy.State.class ~= "战士" then return end
 
 local player = Skippy.GetPlayerInfo()
 local playerAuras = Skippy.GetPlayerAuras
 local spell = Skippy.IsUsableSpellOnUnit
 local cd = Skippy.GetSpellCooldown
-local state = Skippy.state
+local state = Skippy.State
 local rage = state.power.RAGE[1]
 local target = Skippy.Units.target
 local isHeroicStrike = C_Spell.IsCurrentSpell("英勇打击")
@@ -20,7 +20,7 @@ local SwordBoard = Skippy.GetPlayerAuras("剑盾猛攻") -- 剑盾猛攻,盾牌�
 local noSpeedSlowCount = Skippy.AttackSpeedSlow() -- 没有减攻速debuff的敌人数量，有减攻速debuff的敌人数量
 local noPowerSlowCount = Skippy.AttackPowerSlow() -- 没有减攻强debuff的敌人数量，有减攻强debuff的敌人数量
 local enemyCount = Skippy.GetEnemyCount(10)
-local shapeshiftForm = Skippy.state.shapeshiftForm
+local shapeshiftForm = Skippy.State.shapeshiftForm
 local freeHeroicStrike = playerAuras("复仇雕文") -- 复仇雕文,使你的英勇打击技能消耗0点怒气
 local rend = Skippy.GetTargetAurasByPlayer("撕裂") -- 撕裂
 

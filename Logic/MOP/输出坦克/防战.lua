@@ -1,9 +1,9 @@
-if not Skippy or not Skippy.Units or not Skippy.state then return end
-if Skippy.state.class ~= "战士" or Skippy.state.specID ~= 73 then return end
+if not Skippy or not Skippy.Units or not Skippy.State then return end
+if Skippy.State.class ~= "战士" or Skippy.State.specID ~= 73 then return end
 
 local spell = Skippy.GetSpellInfo
 local target = Skippy.Units.target
-local rage = Skippy.state.power.RAGE[1]
+local rage = Skippy.State.power.RAGE[1]
 local targetAuras = Skippy.GetTargetAuras
 local minRange, maxRange = WeakAuras.GetRange("target")
 if not maxRange then maxRange = 30 end

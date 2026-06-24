@@ -1,9 +1,9 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "德鲁伊" or Skippy.state.specID ~= 105 then return end
-if not Skippy.state.inParty then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if Skippy.State.class ~= "德鲁伊" or Skippy.State.specID ~= 105 then return end
+if not Skippy.State.inParty then return Skippy.UnitHeal("Skip", "Skip") end
 
 local currentTime = GetTime()
-local state = Skippy.state
+local state = Skippy.State
 local castUnit = state.CastTargetUnit
 local group = Skippy.Group
 local target = Skippy.Units.target

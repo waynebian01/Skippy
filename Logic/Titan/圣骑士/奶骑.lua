@@ -1,10 +1,10 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "圣骑士" then return end
-if not Skippy.state.inParty then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if Skippy.State.class ~= "圣骑士" then return end
+if not Skippy.State.inParty then return Skippy.UnitHeal("Skip", "Skip") end
 
 -- ===== 状态 =====
 local e = aura_env
-local state = Skippy.state
+local state = Skippy.State
 local castInfo = state.castInfo
 local target = Skippy.Units.target
 local targetCanAttack = target.exists and target.canAttack and not target.isDead

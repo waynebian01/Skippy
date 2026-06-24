@@ -1,10 +1,10 @@
-if not Skippy or not Skippy.Units or not Skippy.state or not Skippy.UnitHeal then return end
-if Skippy.state.class ~= "牧师" or Skippy.state.specID ~= 256 then return end
-if not Skippy.state.inParty then return end
-if not Skippy.Group or not Skippy.state.initialization then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if Skippy.State.class ~= "牧师" or Skippy.State.specID ~= 256 then return end
+if not Skippy.State.inParty then return end
+if not Skippy.Group or not Skippy.State.initialization then return Skippy.UnitHeal("Skip", "Skip") end
 
 local currentTime = GetTime()
-local state = Skippy.state
+local state = Skippy.State
 local target = Skippy.Units.target
 local targetInRange = C_Spell.IsSpellInRange(585, "target")
 local targetCanAttack = target.exists and target.canAttack and targetInRange
@@ -13,8 +13,8 @@ local player = Skippy.GetPlayerInfo()
 local playerAuras = Skippy.GetPlayerAuras
 local isKnown = Skippy.IsSpellKnown
 local spell = Skippy.GetSpellInfo
-local mana = Skippy.state.power.MANA[1]
-local manaMax = Skippy.state.power.MANA[2]
+local mana = Skippy.State.power.MANA[1]
+local manaMax = Skippy.State.power.MANA[2]
 local percentMana = mana / manaMax * 100
 local channel = UnitChannelInfo("player")
 

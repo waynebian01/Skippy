@@ -9,7 +9,7 @@ aura_env.seal = { "命令圣印", "腐蚀圣印", "复仇圣印" }
 function aura_env.InitConfig()
     aura_env.holyLight = aura_env.config["HL_Party"]
     aura_env.flash = aura_env.config["FL_Party"]
-    if Skippy.state.inRaid then
+    if Skippy.State.inRaid then
         aura_env.holyLight = aura_env.config["HL_Raid"]
         aura_env.flash = aura_env.config["FL_Raid"]
     end
