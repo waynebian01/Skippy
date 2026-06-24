@@ -1,5 +1,5 @@
 local spell = Skippy.GetSpellInfo
-local playerAuras = Skippy.GetPlayerAuras
+local playerAuras = Skippy.GetPlayerAuraByName
 local targetAuras = Skippy.GetTargetAurasByPlayer
 
 function aura_env.info()

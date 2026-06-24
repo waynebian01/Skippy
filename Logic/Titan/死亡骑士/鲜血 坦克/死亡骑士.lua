@@ -20,7 +20,7 @@ local canUseBloodSkill = true -- 是否可以使用[鲜血符文]技能
 local useDeathCount = 0 -- 灵界打击使用[死亡符文]的数量
 local canUseDeathStrike = true -- 是否可以使用[灵界打击]
 local isRuneStrike = C_Spell.IsCurrentSpell("符文打击")
-local BloodGorged = Skippy.GetPlayerAuras("啜血") -- 啜血,减少枯萎凋零的消耗
+local BloodGorged = Skippy.GetPlayerAuraByName("啜血") -- 啜血,减少枯萎凋零的消耗
 
 -- 疾病效果
 local plagueInfo = aura_env.PlagueInfo()

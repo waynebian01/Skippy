@@ -16,7 +16,7 @@ local Light = Skippy.GetTargetAuras("圣光审判")
 local Wisdom = Skippy.GetTargetAuras("智慧审判")
 local enemyCount8 = Skippy.GetEnemyCount(8)
 local GlyphofReckoning = C_SpellBook.IsSpellKnown(405004) -- 清算符文: 你的清算之手法术不再嘲讽目标，而且可以对无法嘲讽的目标造成伤害。
-local WarArt = Skippy.GetPlayerAuras(59578)               --战争艺术
+local WarArt = Skippy.GetPlayerAuraByName(59578)               --战争艺术
 local DemonsCount = Skippy.GetEnemyCountWithCreatureType(10, "恶魔")
 local UndeadCount = Skippy.GetEnemyCountWithCreatureType(10, "亡灵")
 

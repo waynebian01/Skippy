@@ -6,7 +6,7 @@ if not Skippy.Group or not Skippy.State.initialization then return Skippy.UnitHe
 local state = Skippy.State
 local target = Skippy.Units.target
 local targetCanAttack = target.exists and target.canAttack and C_Spell.IsSpellInRange("猛虎掌", "target")
-local playerAuras = Skippy.GetPlayerAuras
+local playerAuras = Skippy.GetPlayerAuraByName
 local isKnown = Skippy.IsSpellKnown
 local spell = Skippy.GetSpellInfo
 local channeling = UnitChannelInfo("player")

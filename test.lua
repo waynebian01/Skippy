@@ -10,9 +10,7 @@ local function appendUnit(id, obj)
     if not obj.exists and not obj.name then return end
 
     local hp = "-"
-    if obj.healthInfo and obj.healthInfo.healthMax and obj.healthInfo.healthMax > 0 then
-        hp = string.format("%.0f%%", obj.healthInfo.health / obj.healthInfo.healthMax * 100)
-    elseif obj.healthPercent then
+    if obj.healthPercent then
         hp = string.format("%.0f%%", obj.healthPercent)
     end
 
