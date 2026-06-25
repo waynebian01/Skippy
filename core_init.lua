@@ -117,7 +117,7 @@ do
     local i = 1
     for _, m in ipairs(modifiers) do
         for _, k in ipairs(keys) do
-            macroKind[i] = m .. " - " .. k
+            macroKind[i] = m .. "-" .. k
             i = i + 1
         end
     end
@@ -137,6 +137,7 @@ local function createMacro(name, key, macro)
         btn:SetAttribute("type", "macro")
         btn:RegisterForClicks("AnyUp", "AnyDown")
         macroList[name] = btn
+        SetOverrideBindingClick(UIParent, false, key, name, "LeftButton")
     end
 
     btn:SetAttribute("macrotext", macro)
@@ -226,11 +227,11 @@ function Skippy.CreateMacros(unitSpellList, staticSpellList)
         end
         index = index + 1
     end
-    -- for spellName, data in pairs(spellMap) do
+    -- for spellName, data in pairs(Skippy.SpellMap) do
     --     for unit, macroIndex in pairs(data) do
     --         local keyBinding = macroKind[macroIndex]
     --         print(spellName ..
-    --         " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
+    --             " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
     --     end
     -- end
 end
@@ -429,7 +430,7 @@ function Skippy.GetSpellCooldown(spellIdentifier)
         end
         return cdLeft
     end
-    return nil
+    return 0
 end
 
 -- 判断技能是否可用
@@ -1157,10 +1158,42 @@ function Skippy.hookChatFrameEditBox()
     end
 end
 
-Skippy.GetUnitInfo("player")
-Skippy.InitBossUnit()
-Skippy.GetCharacterTalentInfo()
+function Skippy.CreateClassMacros(id)
+    local config = classMacroConfig[id]
+    if not config then
+        Skippy.macrosReady = false
+        return false
+    end
+    Skippy.CreateMacros(config.unit, config.static)
+    Skippy.macrosReady = true
+    return true
+end
 
+local function initClassMacros()
+    Skippy.CreateClassMacros(Skippy.State.classId)
+    WeakAuras.ScanEvents("SKIPPY_INIT_COMPLETE")
+end
+
+if InCombatLockdown() then
+    local macroInitFrame = CreateFrame("Frame")
+    macroInitFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    macroInitFrame:SetScript("OnEvent", function(self)
+        initClassMacros()
+        self:UnregisterAllEvents()
+    end)
+else
+    initClassMacros()
+end
+
+Skippy.GetUnitInfo("player")    -- 获取玩家信息
+Skippy.GetCharacterTalentInfo() -- 更新组单位信息
+Skippy.InitBossUnit()           -- 初始化Boss单位
+Skippy.GetCharacterTalentInfo() -- 获取角色天赋信息
+Skippy.GetSpellBookInfo()       -- 获取技能书信息
+Skippy.GetGlyphInfo()           -- 获取Glyph信息
+Skippy.UpdateAllTotem()         -- 更新所有图腾信息
+Skippy.UpdateShapeshiftForm()   -- 更新玩家形态信息
+Skippy.UpdateGroupUnit()        -- 更新组单位信息
 
 --==============================================================================
 --  查找单位或数量的相关函数
@@ -1642,31 +1675,4 @@ function Skippy.GetUnitWithdispelName(dispelName)
         end
     end
     return nil
-end
-
-function Skippy.CreateClassMacros(id)
-    local config = classMacroConfig[id]
-    if not config then
-        Skippy.macrosReady = false
-        return false
-    end
-    Skippy.CreateMacros(config.unit, config.static)
-    Skippy.macrosReady = true
-    return true
-end
-
-local function initClassMacros()
-    Skippy.CreateClassMacros(Skippy.State.classId)
-    WeakAuras.ScanEvents("SKIPPY_INIT_COMPLETE")
-end
-
-if InCombatLockdown() then
-    local macroInitFrame = CreateFrame("Frame")
-    macroInitFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-    macroInitFrame:SetScript("OnEvent", function(self)
-        initClassMacros()
-        self:UnregisterAllEvents()
-    end)
-else
-    initClassMacros()
 end
