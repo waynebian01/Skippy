@@ -19,7 +19,7 @@ Skippy.InsertSpells = Skippy.InsertSpells or {}
 Skippy.State = {
     auras = {}
 }
-local playerAuras = Skippy.State.auras
+
 Skippy.Units = {
     ["target"] = {},
     ["focus"] = {},
@@ -501,7 +501,7 @@ function Skippy.GetFullHealth(unit)
         obj.healthInfo = {
             health = UnitHealth(unit),
             healthMax = UnitHealthMax(unit),
-            healAbsorbs = UnitGetIncomingHeals(unit),
+            healAbsorbs = UnitGetTotalHealAbsorbs(unit),
             healPrediction = UnitGetIncomingHeals(unit),
         }
     end
@@ -529,7 +529,14 @@ end
 function Skippy.UpdateAuraFull(unit)
     local obj = GetUnitObj(unit)
     if obj then
-        obj.auras = {}
+        if unit == "player" then
+            Skippy.State.auras = Skippy.State.auras or {}
+            wipe(Skippy.State.auras)
+            obj.auras = Skippy.State.auras
+        else
+            obj.auras = {}
+        end
+
         for i = 1, 40 do
             local buff = C_UnitAuras.GetBuffDataByIndex(unit, i)
             local debuff = C_UnitAuras.GetDebuffDataByIndex(unit, i)
@@ -805,7 +812,7 @@ function Skippy.UpdateAuraInfo(unit, info)
             for _, aura in pairs(info.addedAuras) do
                 obj.auras[aura.auraInstanceID] = aura
                 if unit == "player" then
-                    playerAuras[aura.auraInstanceID] = aura
+                    Skippy.State.auras[aura.auraInstanceID] = aura
                 end
             end
         end
@@ -816,7 +823,7 @@ function Skippy.UpdateAuraInfo(unit, info)
                 if aura then
                     obj.auras[id] = aura
                     if unit == "player" then
-                        playerAuras[id] = aura
+                        Skippy.State.auras[id] = aura
                     end
                 end
             end
@@ -827,7 +834,7 @@ function Skippy.UpdateAuraInfo(unit, info)
                 if obj.auras[id] then
                     obj.auras[id] = nil
                     if unit == "player" then
-                        playerAuras[id] = nil
+                        Skippy.State.auras[id] = nil
                     end
                 end
             end
@@ -837,6 +844,7 @@ end
 
 -- 事件更新 获取玩家形态
 function Skippy.UpdateShapeshiftForm()
+    Skippy.State.shapeshiftFormID = GetShapeshiftFormID() or 0
     Skippy.State.shapeshiftForm = {}
     for i = 1, GetNumShapeshiftForms() do
         local _, active, _, spellID = GetShapeshiftFormInfo(i);
@@ -1203,27 +1211,24 @@ local function existsUnit(data)
     return data.inRange and data.canAssist and data.inSight and not data.isDead
 end
 
----@param unit string 单位名称，如：party1、raid2...
----@param auraName string 光环名称
----@param byPlayerOnly boolean 是否只返回玩家光环
----@return table|nil auraTable 光环信息
-local function getUnitAuraByName(unit, auraName, byPlayerOnly)
-    local obj = nil
+local function getAuraOwner(unit)
     if unit == "player" then
-        obj = Skippy.State
-    else
-        obj = GetUnitObj(unit)
+        return Skippy.State
     end
+    return GetUnitObj(unit)
+end
+
+local function isAuraFromPlayer(aura, byPlayerOnly)
+    return not byPlayerOnly or aura.sourceUnit == "player"
+end
+
+local function getUnitAura(unit, key, value, byPlayerOnly)
+    local obj = getAuraOwner(unit)
     if not obj or not obj.auras then return nil end
+
     for _, aura in pairs(obj.auras) do
-        if aura.name == auraName then
-            if byPlayerOnly then
-                if aura.sourceUnit == "player" then
-                    return aura
-                end
-            else
-                return aura
-            end
+        if aura[key] == value and isAuraFromPlayer(aura, byPlayerOnly) then
+            return aura
         end
     end
     return nil
@@ -1233,21 +1238,8 @@ end
 ---@param auraName string 光环名称
 ---@param byPlayerOnly boolean 是否只返回玩家光环
 ---@return table|nil auraTable 光环信息
-local function getGroupUnitAuraByName(unit, auraName, byPlayerOnly)
-    local obj = GetUnitObj(unit)
-    if not obj or not obj.auras then return nil end
-    for _, aura in pairs(obj.auras) do
-        if aura.name == auraName then
-            if byPlayerOnly then
-                if aura.sourceUnit == "player" then
-                    return aura
-                end
-            else
-                return aura
-            end
-        end
-    end
-    return nil
+local function getUnitAuraByName(unit, auraName, byPlayerOnly)
+    return getUnitAura(unit, "name", auraName, byPlayerOnly)
 end
 
 ---@param unit string 单位名称，如：party1、raid2...
@@ -1255,25 +1247,7 @@ end
 ---@param byPlayerOnly boolean 是否只返回玩家光环
 ---@return table|nil auraTable 光环信息
 local function getUnitAuraBySpellId(unit, spellId, byPlayerOnly)
-    local obj = nil
-    if unit == "player" then
-        obj = Skippy.State
-    else
-        obj = GetUnitObj(unit)
-    end
-    if not obj then return nil end
-    for _, aura in pairs(obj.auras) do
-        if aura.spellId == spellId then
-            if byPlayerOnly then
-                if aura.sourceUnit == "player" then
-                    return aura
-                end
-            else
-                return aura
-            end
-        end
-    end
-    return nil
+    return getUnitAura(unit, "spellId", spellId, byPlayerOnly)
 end
 
 -- 创建光环名称集合
@@ -1285,6 +1259,37 @@ local function makeAuraSet(auraTable)
         set[name] = true
     end
     return set
+end
+
+local function normalizeRole(role)
+    return role ~= "" and role or nil
+end
+
+local function matchRole(data, role, hasRole)
+    role = normalizeRole(role)
+    if hasRole == nil then hasRole = true end
+    if not role then return true end
+    return (data.role == role) == hasRole
+end
+
+local function findLowestGroupUnit(predicate)
+    local lowestUnit = nil
+    local lowestHealth = 100
+    local lowestAura = nil
+
+    for unit, data in pairs(Skippy.Units.Group) do
+        local healthPercent = data.healthPercent
+        if healthPercent and existsUnit(data) then
+            local matched, aura = predicate(unit, data, healthPercent)
+            if matched and healthPercent < lowestHealth then
+                lowestHealth = healthPercent
+                lowestUnit = unit
+                lowestAura = aura
+            end
+        end
+    end
+
+    return lowestUnit, lowestHealth, lowestAura
 end
 
 -- 获取玩家光环
@@ -1348,11 +1353,13 @@ function Skippy.GetGroupAverageHealthPct()
     local totalHealth = 0
     local totalMaxHealth = 0
     for unit, data in pairs(Skippy.Units.Group) do
-        if existsUnit(data) then
-            totalHealth = totalHealth + data.health
-            totalMaxHealth = totalMaxHealth + data.maxHealth
+        local healthInfo = data.healthInfo
+        if healthInfo and existsUnit(data) then
+            totalHealth = totalHealth + (healthInfo.health or 0)
+            totalMaxHealth = totalMaxHealth + (healthInfo.healthMax or 0)
         end
     end
+    if totalMaxHealth == 0 then return 0 end
     return totalHealth / totalMaxHealth * 100
 end
 
@@ -1441,24 +1448,15 @@ function Skippy.GetGroupCountByAuraState(healthThreshold, auraName, hasAura, byP
     healthThreshold = healthThreshold or 100
     if hasAura == nil then hasAura = true end
     if byPlayerOnly == nil then byPlayerOnly = true end
-    if hasRole == nil then hasRole = true end
-    if role == "" then role = nil end
     local count = 0
+
     for unit, data in pairs(Skippy.Units.Group) do
-        if existsUnit(data) and data.healthPercent then
-            local roleMatch = true
-            if role then
-                local isThisRole = (data.role == role)
-                roleMatch = (isThisRole == hasRole)
-            end
-            if roleMatch then
-                local healthPercent = data.healthPercent
-                if healthPercent <= healthThreshold then
-                    local currentAura = getUnitAuraByName(unit, auraName, byPlayerOnly)
-                    local hasIt = not not currentAura
-                    if hasIt == hasAura then
-                        count = count + 1
-                    end
+        local healthPercent = data.healthPercent
+        if healthPercent and existsUnit(data) and matchRole(data, role, hasRole) then
+            if healthPercent <= healthThreshold then
+                local currentAura = getUnitAuraByName(unit, auraName, byPlayerOnly)
+                if (not not currentAura) == hasAura then
+                    count = count + 1
                 end
             end
         end
@@ -1492,17 +1490,9 @@ end
 ---@return string|nil 生命值最低的单位
 ---@return number|nil 生命值百分比
 function Skippy.GetLowestUnit()
-    local lowestUnit = nil
-    local lowestHealth = 100
-    for unit, data in pairs(Skippy.Units.Group) do
-        local healthPercent = data.healthPercent
-        if existsUnit(data) then
-            if healthPercent < lowestHealth then
-                lowestHealth = healthPercent
-                lowestUnit = unit
-            end
-        end
-    end
+    local lowestUnit, lowestHealth = findLowestGroupUnit(function()
+        return true
+    end)
     return lowestUnit, lowestHealth
 end
 
@@ -1510,17 +1500,9 @@ end
 ---@return string|nil 生命值最低的单位
 ---@return number|nil 生命值百分比
 function Skippy.GetLowestUnitWithoutUnit(unitId)
-    local lowestUnit = nil
-    local lowestHealth = 100
-    for unit, data in pairs(Skippy.Units.Group) do
-        local isSame = UnitIsUnit(unit, unitId)
-        if existsUnit(data) and not isSame then
-            if data.healthPercent < lowestHealth then
-                lowestHealth = data.healthPercent
-                lowestUnit = unit
-            end
-        end
-    end
+    local lowestUnit, lowestHealth = findLowestGroupUnit(function(unit)
+        return not UnitIsUnit(unit, unitId)
+    end)
     return lowestUnit, lowestHealth
 end
 
@@ -1530,20 +1512,10 @@ end
 ---@return string|nil 生命值最低的单位
 ---@return number|nil 生命值百分比
 function Skippy.GetLowestUnitWithRoles(role1, role2, role3)
-    local lowestUnit = nil
-    local lowestHealth = 100
-    for unit, data in pairs(Skippy.Units.Group) do
-        local healthPercent = data.healthPercent
+    local lowestUnit, lowestHealth = findLowestGroupUnit(function(_, data)
         local role = data.role
-        if existsUnit(data) then
-            if (role1 and role == role1) or (role2 and role == role2) or (role3 and role == role3) then
-                if healthPercent < lowestHealth then
-                    lowestHealth = healthPercent
-                    lowestUnit = unit
-                end
-            end
-        end
-    end
+        return (role1 and role == role1) or (role2 and role == role2) or (role3 and role == role3)
+    end)
     return lowestUnit, lowestHealth
 end
 
@@ -1556,53 +1528,16 @@ end
 ---@return number|nil 生命值百分比
 ---@return table|nil 光环信息
 function Skippy.GetLowestUnitByAuraState(auraName, hasAura, byPlayerOnly, role, hasRole)
-    -- 安全处理默认值
     if hasAura == nil then hasAura = true end
     if byPlayerOnly == nil then byPlayerOnly = true end
-    if hasRole == nil then hasRole = true end
-    if role == "" then role = nil end
 
-    local lowestUnit = nil
-    local lowestHealth = 100   -- 初始化为最大百分比
-    local lowestUnitAura = nil -- 专门用来存储最终找到的那个单位的光环
+    local lowestUnit, lowestHealth, lowestUnitAura = findLowestGroupUnit(function(unit, data)
+        if not matchRole(data, role, hasRole) then return false end
+        local currentAura = getUnitAuraByName(unit, auraName, byPlayerOnly)
+        return (not not currentAura) == hasAura, currentAura
+    end)
 
-    for unit, data in pairs(Skippy.Units.Group) do
-        -- 假设 existsUnit 是判断 data 是否合法的函数，同时通常需要确保 healthPercent 存在
-        if existsUnit(data) and data.healthPercent then
-            -- 1. 职责过滤逻辑
-            local roleMatch = true
-            if role then
-                -- 判断当前单位职责是否等于目标职责
-                local isThisRole = (data.role == role)
-                -- 核心逻辑：当前状态是否符合【包含/不包含】的选择
-                roleMatch = (isThisRole == hasRole)
-            end
-
-            -- 如果职责匹配成功，再进行光环和血量判定
-            if roleMatch then
-                local healthPercent = data.healthPercent
-
-                -- 2. 获取当前遍历单位的光环状态
-                local currentAura = getGroupUnitAuraByName(unit, auraName, byPlayerOnly)
-                local hasIt = not not currentAura
-
-                -- 3. 判断是否符合光环筛选条件
-                if hasIt == hasAura then
-                    -- 4. 寻找生命值百分比最低的单位
-                    if healthPercent < lowestHealth then
-                        lowestHealth = healthPercent
-                        lowestUnit = unit
-                        lowestUnitAura = currentAura
-                    end
-                end
-            end
-        end
-    end
-
-    if not lowestUnit then
-        return nil, nil, nil
-    end
-
+    if not lowestUnit then return nil, nil, nil end
     return lowestUnit, lowestHealth, lowestUnitAura
 end
 
@@ -1616,49 +1551,21 @@ function Skippy.GetLowestUnitWithAnyAuras(auraTable, byPlayerOnly)
     if byPlayerOnly == nil then byPlayerOnly = true end
 
     local auraSet = makeAuraSet(auraTable)
-    local lowestUnit = nil
-    local lowestHealth = 100
-    local lowestUnitAura = nil
 
-    for unit, data in pairs(Skippy.Units.Group) do
-        if existsUnit(data) and data.healthPercent then
-            local healthPercent = data.healthPercent
-            if healthPercent < lowestHealth then
-                local obj = nil
-                if unit == "player" then
-                    obj = Skippy.State
-                else
-                    obj = GetUnitObj(unit)
-                end
+    local lowestUnit, lowestHealth, lowestUnitAura = findLowestGroupUnit(function(unit)
+        local obj = getAuraOwner(unit)
+        if not obj or not obj.auras then return false end
 
-                if obj and obj.auras then
-                    local matchedAura = nil
-                    for _, aura in pairs(obj.auras) do
-                        if auraSet[aura.name] then
-                            if byPlayerOnly then
-                                if aura.sourceUnit == "player" then
-                                    matchedAura = aura
-                                    break
-                                end
-                            else
-                                matchedAura = aura
-                                break
-                            end
-                        end
-                    end
-                    if matchedAura then
-                        lowestHealth = healthPercent
-                        lowestUnit = unit
-                        lowestUnitAura = matchedAura
-                    end
-                end
+        for _, aura in pairs(obj.auras) do
+            if auraSet[aura.name] and isAuraFromPlayer(aura, byPlayerOnly) then
+                return true, aura
             end
         end
-    end
 
-    if not lowestUnit then
-        return nil, nil, nil
-    end
+        return false
+    end)
+
+    if not lowestUnit then return nil, nil, nil end
     return lowestUnit, lowestHealth, lowestUnitAura
 end
 
