@@ -10,6 +10,8 @@ local tinsert = table.insert
 --  基础table
 --==============================================================================
 Skippy.index = 0
+Skippy.iconID = nil
+Skippy.Go = true
 Skippy.SpellInfo = Skippy.SpellInfo or {}
 Skippy.SpellBook = Skippy.SpellBook or {}
 Skippy.GlyphInfo = Skippy.GlyphInfo or {}
@@ -32,7 +34,7 @@ local spellFunc = {
     FUTURESPELL = GetSpellInfo,
     FLYOUT = GetFlyoutInfo,
 }
-
+local mounts = {}
 local unitList = {}
 local EnumPowerType = {
     ["MANA"] = 0,
@@ -58,6 +60,30 @@ local EnumPowerType = {
 }
 
 local classMacroConfig = {
+    -- 战士 (classId 1)：输出/坦克技能均为 /cast 当前目标，全部走 static "spell"
+    [1] = {
+        unit = {},
+        static = {
+            { "盾牌格挡" },
+            { "雷霆一击" },
+            { "巨龙怒吼" },
+            { "复仇" },
+            { "盾牌猛击" },
+            { "斩杀" },
+            { "战斗怒吼" },
+            { "毁灭打击" },
+            { "嗜血" },
+            { "巨人打击" },
+            { "狂暴之怒" },
+            { "风暴之锤" },
+            { "怒击" },
+            { "英勇打击" },
+            { "狂风打击" },
+            { "剑刃风暴" },
+            { "旋风斩" },
+            { "顺劈斩" },
+        },
+    },
     -- 圣骑士 (classId 2)
     [2] = {
         unit = {
@@ -87,8 +113,65 @@ local classMacroConfig = {
             { "神圣棱镜", "target" },
         },
     },
+    -- 牧师 (classId 5)：戒律(256) + 神圣(257)
+    [5] = {
+        unit = {
+            "恢复", "真言术：盾", "苦修", "愈合祷言", "治疗术",
+            "联结治疗", "强效治疗术", "快速治疗", "神圣之星", "圣言术：静",
+        },
+        static = {
+            { "绝望祷言" }, { "心灵专注" }, { "治疗祷言" }, { "天使长" },
+            { "暗影魔", "target" }, { "神圣之火", "target" }, { "惩击", "target" },
+            { "治疗之环" },
+        },
+    },
+    -- 萨满祭司 (classId 7)：恢复(264)
+    [7] = {
+        unit = {
+            "大地之盾", "激流", "治疗链", "治疗之涌", "强效治疗波", "治疗波",
+        },
+        static = {
+            { "大地生命武器" }, { "水之护盾" }, { "治疗之泉图腾" }, { "元素释放" },
+        },
+    },
+    -- 武僧 (classId 10)：踏风/织雾(270)
+    [10] = {
+        unit = {
+            "禅意珠", "复苏之雾", "升腾之雾", "真气波", "抚慰之雾", "氤氲之雾",
+        },
+        static = {
+            { "法力茶" }, { "振魂引" }, { "雷光聚神茶" }, { "移花接木" }, { "真气爆裂" },
+            { "真气酒" }, { "神鹤引项踢" },
+            { "幻灭踢", "target" }, { "猛虎掌", "target" }, { "贯日击", "target" },
+        },
+    },
+    -- 德鲁伊 (classId 11)：恢复(105)
+    [11] = {
+        unit = {
+            "生命绽放", "愈合", "回春术", "治疗之触", "滋养", "迅捷治愈",
+        },
+        static = {
+            { "野性成长" }, { "自然迅捷" },
+        },
+    },
+}
+local travelNumber = {
+    [3] = true,  -- 旅行形态
+    [4] = true,  -- 水栖形态
+    [16] = true, -- 幽灵狼
+    [27] = true, -- 飞行形态
+    [29] = true, -- 飞行形态
 }
 
+local function updateGo()
+    local go = true
+    local state = Skippy.State
+    local travel = travelNumber[state.shapeshiftFormID]
+    if state.isMounted or state.isDead or state.isChatOpen or travel or state.stealth or state.isCastingMount then
+        go = false
+    end
+    Skippy.Go = go
+end
 
 
 --==============================================================================
@@ -241,8 +324,13 @@ end
 --==============================================================================
 function Skippy.updateSpellIndex(unit, spellName)
     if not spellName or not Skippy.SpellMap or not Skippy.SpellMap[spellName] then
+        Skippy.iconID = nil
         Skippy.index = 0
         return true
+    end
+    local spellInfo = Skippy.SpellInfo[spellName]
+    if spellInfo then
+        Skippy.iconID = spellInfo.spellInfo.iconID
     end
     if unit and Skippy.SpellMap[spellName][unit] then
         Skippy.index = Skippy.SpellMap[spellName][unit]
@@ -252,54 +340,71 @@ function Skippy.updateSpellIndex(unit, spellName)
     return true
 end
 
+-- 把单位归类到所属容器：返回 容器表, 键, 是否单例(target/focus)
+-- 单例存放在 Skippy.Units 顶层、清理时重置为空表；其余存放在对应子表、清理时移除
+local function classifyUnit(unit)
+    if not unit then return nil end
+    if unit == "target" or unit == "focus" then
+        return Skippy.Units, unit, true
+    elseif unit == "player" or unit:match("^party%d+$") or unit:match("^raid%d+$") then
+        return Skippy.Units.Group, unit, false
+    elseif unit:match("^boss%d+$") then
+        return Skippy.Units.Boss, unit, false
+    elseif unit:match("^nameplate%d+$") then
+        return Skippy.Units.Nameplate, unit, false
+    end
+    return nil
+end
+
+local function getMountsInfo()
+    local numMounts = C_MountJournal.GetNumDisplayedMounts()
+    for i = 1, numMounts do
+        local _, spellID, _, _, _, _, _, _, _, _, isCollected = C_MountJournal.GetDisplayedMountInfo(i)
+        if isCollected then
+            mounts[spellID] = true
+        end
+    end
+end
+
+local function isPlayerCastingMount(unit, spellId)
+    if unit ~= "player" then return end
+    local isCastingMounts = mounts[spellId]
+    Skippy.State.isCastingMount = isCastingMounts
+    updateGo()
+end
+
+local function isPlayerStopCastingMount(unit)
+    if unit ~= "player" then return end
+    Skippy.State.isCastingMount = false
+    updateGo()
+end
+
 -- 获取单位对象
 local function GetUnitObj(unit)
-    if not unit then return nil end
-    return Skippy.Units[unit] or
-        Skippy.Units.Group[unit] or
-        Skippy.Units.Boss[unit] or
-        Skippy.Units.Nameplate[unit]
+    local container, key = classifyUnit(unit)
+    if not container then return nil end
+    return container[key]
 end
 
 -- 确保单位对象
 local function EnsureUnitObj(unit)
-    local obj = GetUnitObj(unit)
-    if obj then return obj end
-    if not unit then return nil end
-
-    if unit == "target" then
-        Skippy.Units.target = {}
-        obj = Skippy.Units.target
-    elseif unit == "focus" then
-        Skippy.Units.focus = {}
-        obj = Skippy.Units.focus
-    elseif unit == "player" or unit:match("^party%d+$") or unit:match("^raid%d+$") then
-        Skippy.Units.Group[unit] = {}
-        obj = Skippy.Units.Group[unit]
-    elseif unit:match("^boss%d+$") then
-        Skippy.Units.Boss[unit] = {}
-        obj = Skippy.Units.Boss[unit]
-    elseif unit:match("^nameplate%d+$") then
-        Skippy.Units.Nameplate[unit] = {}
-        obj = Skippy.Units.Nameplate[unit]
-    else
-        return nil
+    local container, key = classifyUnit(unit)
+    if not container then return nil end
+    local obj = container[key]
+    if not obj then
+        obj = {}
+        container[key] = obj
     end
     return obj
 end
 
 local function ClearUnitObj(unit)
-    if not unit then return end
-    if unit == "target" then
-        Skippy.Units.target = {}
-    elseif unit == "focus" then
-        Skippy.Units.focus = {}
-    elseif unit == "player" or unit:match("^party%d+$") or unit:match("^raid%d+$") then
-        Skippy.Units.Group[unit] = nil
-    elseif unit:match("^boss%d+$") then
-        Skippy.Units.Boss[unit] = nil
-    elseif unit:match("^nameplate%d+$") then
-        Skippy.Units.Nameplate[unit] = nil
+    local container, key, singleton = classifyUnit(unit)
+    if not container then return end
+    if singleton then
+        container[key] = {}
+    else
+        container[key] = nil
     end
 end
 
@@ -347,9 +452,9 @@ end
 function Skippy.InitBossUnit()
     Skippy.Units.Boss = {}
     for i = 1, 5 do
-        local unit = "boss" .. i
-        Skippy.GetUnitInfo(unit)
+        Skippy.GetUnitInfo("boss" .. i, true)
     end
+    Skippy.SyncUnitList()
 end
 
 local function addSpellInfo(spellName)
@@ -392,8 +497,9 @@ function Skippy.GetSpellBookInfo()
         local _, _, offset, numSlots = GetSpellTabInfo(i)
         for j = offset + 1, offset + numSlots do
             local spellType, id = GetSpellBookItemInfo(j, BOOKTYPE_SPELL)
-            local spellName = spellFunc[spellType](id)
-            if not Skippy.SpellBook[spellName] then
+            local getName = spellFunc[spellType]
+            local spellName = getName and getName(id)
+            if spellName then
                 Skippy.SpellBook[spellName] = true
             end
         end
@@ -402,6 +508,12 @@ function Skippy.GetSpellBookInfo()
     for spellName in pairs(Skippy.SpellBook) do
         addSpellInfo(spellName)
     end
+end
+
+-- 判断是否学会某技能（名称或ID）
+function Skippy.IsSpellKnown(spellIdentifier)
+    local name = C_Spell.GetSpellName(spellIdentifier) or spellIdentifier
+    return Skippy.SpellBook[name] == true
 end
 
 -- 公共冷却
@@ -477,20 +589,32 @@ function Skippy.GetGlyphInfo()
     end
 end
 
+-- 由 healthInfo 计算血量百分比，返回 含预读盾百分比, 真实百分比
+local function computeHealthPercent(obj)
+    local hi = obj.healthInfo
+    if not hi then return 0, 0 end
+    local h = hi.health or 0
+    local m = hi.healthMax or 0
+    local a = hi.healAbsorbs or 0
+    local p = hi.healPrediction or 0
+    if m <= 0 then return 0, 0 end
+    return math.max(0, (h - a + p) / m * 100), math.max(0, (h - a) / m * 100)
+end
+
+-- 把血量百分比写回单位对象，player 同步镜像到 State.healthInfo
+local function applyHealthPercent(unit, obj)
+    obj.healthPercent, obj.realHealthPercent = computeHealthPercent(obj)
+    if unit == "player" then
+        Skippy.State.healthInfo.healthPercent = obj.healthPercent
+        Skippy.State.healthInfo.realHealthPercent = obj.realHealthPercent
+    end
+end
+
 -- 计算血量百分比
 function Skippy.UpdateUnitHealth(unit)
     local obj = GetUnitObj(unit)
     if obj and obj.healthInfo then
-        local h = obj.healthInfo.health or 0
-        local m = obj.healthInfo.healthMax or 0
-        local a = obj.healthInfo.healAbsorbs or 0
-        local p = obj.healthInfo.healPrediction or 0
-        obj.healthPercent = m > 0 and math.max(0, ((h - a + p) / m * 100)) or 0
-        obj.realHealthPercent = m > 0 and math.max(0, ((h - a) / m * 100)) or 0
-        if unit == "player" then
-            Skippy.State.healthInfo.healthPercent = obj.healthPercent
-            Skippy.State.healthInfo.realHealthPercent = obj.realHealthPercent
-        end
+        applyHealthPercent(unit, obj)
     end
 end
 
@@ -498,12 +622,15 @@ end
 function Skippy.GetFullHealth(unit)
     local obj = GetUnitObj(unit)
     if obj then
-        obj.healthInfo = {
-            health = UnitHealth(unit),
-            healthMax = UnitHealthMax(unit),
-            healAbsorbs = UnitGetTotalHealAbsorbs(unit),
-            healPrediction = UnitGetIncomingHeals(unit),
-        }
+        local hi = obj.healthInfo
+        if not hi then
+            hi = {}
+            obj.healthInfo = hi
+        end
+        hi.health = UnitHealth(unit)
+        hi.healthMax = UnitHealthMax(unit)
+        hi.healAbsorbs = UnitGetTotalHealAbsorbs(unit)
+        hi.healPrediction = UnitGetIncomingHeals(unit)
     end
     Skippy.UpdateUnitHealth(unit)
 end
@@ -511,17 +638,7 @@ end
 -- 更新所有图腾信息
 function Skippy.UpdateAllTotem()
     for i = 1, 4 do -- 1:火,2:土,3:水,4:空气
-        local _, totemName, startTime, duration, _, _, spellID = GetTotemInfo(i)
-        if totemName ~= "" then
-            Skippy.State.totems[i] = {
-                name = totemName,
-                startTime = startTime,
-                duration = duration,
-                spellID = spellID,
-            }
-        else
-            Skippy.State.totems[i] = nil
-        end
+        Skippy.UpdateTotem(i)
     end
 end
 
@@ -539,13 +656,13 @@ function Skippy.UpdateAuraFull(unit)
 
         for i = 1, 40 do
             local buff = C_UnitAuras.GetBuffDataByIndex(unit, i)
+            if not buff then break end
+            obj.auras[buff.auraInstanceID] = buff
+        end
+        for i = 1, 40 do
             local debuff = C_UnitAuras.GetDebuffDataByIndex(unit, i)
-            if buff then
-                obj.auras[buff.auraInstanceID] = buff
-            end
-            if debuff then
-                obj.auras[debuff.auraInstanceID] = debuff
-            end
+            if not debuff then break end
+            obj.auras[debuff.auraInstanceID] = debuff
         end
     end
 end
@@ -561,7 +678,8 @@ function Skippy.UpdateMaxAndMinRange(unit)
 end
 
 -- 获取单位完整信息
-function Skippy.GetUnitInfo(unit)
+-- skipSync=true 时跳过单位列表同步，供批量循环调用，循环结束后再统一调用一次 SyncUnitList
+function Skippy.GetUnitInfo(unit, skipSync)
     if UnitExists(unit) then
         local obj = EnsureUnitObj(unit)
         if not obj then return end
@@ -587,7 +705,9 @@ function Skippy.GetUnitInfo(unit)
     else
         ClearUnitObj(unit)
     end
-    Skippy.SyncUnitList()
+    if not skipSync then
+        Skippy.SyncUnitList()
+    end
 end
 
 -- 检测单位存活状态
@@ -668,38 +788,40 @@ function Skippy.UpdateHealth(unit, key, getter)
         obj.isDead = UnitIsDeadOrGhost(unit)
     end
 
-    local h = obj.healthInfo.health or 0
-    local m = obj.healthInfo.healthMax or 0
-    local a = obj.healthInfo.healAbsorbs or 0
-    local p = obj.healthInfo.healPrediction or 0
-
-    obj.healthPercent = m > 0 and math.max(0, ((h - a + p) / m * 100)) or 0
-    obj.realHealthPercent = m > 0 and math.max(0, ((h - a) / m * 100)) or 0
+    applyHealthPercent(unit, obj)
 end
 
 -- 事件更新 能量信息
 function Skippy.UpdatePower(unit, powerType)
+    if unit ~= "player" then return end
     local powerIndex = EnumPowerType[powerType]
-    local powerMax = UnitPowerMax(unit, powerIndex)
-    if unit == "player" and powerIndex and powerMax > 0 then
-        Skippy.State.power[powerType] = {}
-        local power = Skippy.State.power[powerType]
-        power.powerValue = UnitPower(unit, powerIndex)
-        power.powerMax = powerMax
-        power.powerPercent = power.powerValue / power.powerMax * 100
+    if not powerIndex then return end
+    -- 复用已有表（避免每次能量跳动新建表造成 GC 抖动）；不存在则建置零表，杜绝下游 nil 索引
+    local power = Skippy.State.power[powerType]
+    if not power then
+        power = { powerValue = 0, powerMax = 0, powerPercent = 0 }
+        Skippy.State.power[powerType] = power
     end
+    local powerMax = UnitPowerMax(unit, powerIndex)
+    local powerValue = UnitPower(unit, powerIndex)
+    power.powerValue = powerValue
+    power.powerMax = powerMax
+    power.powerPercent = powerMax > 0 and (powerValue / powerMax * 100) or 0
 end
 
 -- 事件更新 图腾信息
 function Skippy.UpdateTotem(i)
     local _, totemName, startTime, duration, _, _, spellID = GetTotemInfo(i)
     if totemName ~= "" then
-        Skippy.State.totems[i] = {
-            name = totemName,
-            startTime = startTime,
-            duration = duration,
-            spellID = spellID,
-        }
+        local t = Skippy.State.totems[i]
+        if not t then
+            t = {}
+            Skippy.State.totems[i] = t
+        end
+        t.name = totemName
+        t.startTime = startTime
+        t.duration = duration
+        t.spellID = spellID
     else
         Skippy.State.totems[i] = nil
     end
@@ -711,12 +833,15 @@ function Skippy.UpdateCastingInfo(unit)
     if obj then
         local name, _, _, startTimeMS, endTimeMS, _, _, _, spellId = UnitCastingInfo(unit)
         if name then
-            obj.castInfo = {
-                name = name,
-                startTimeMS = startTimeMS,
-                endTimeMS = endTimeMS,
-                spellID = spellId,
-            }
+            local c = obj.castInfo
+            if not c then
+                c = {}
+                obj.castInfo = c
+            end
+            c.name = name
+            c.startTimeMS = startTimeMS
+            c.endTimeMS = endTimeMS
+            c.spellID = spellId
         else
             obj.castInfo = nil
             Skippy.State.CastTargetName = nil
@@ -734,12 +859,15 @@ function Skippy.UpdateChannelingInfo(unit)
     if obj then
         local name, _, _, startTimeMs, endTimeMs, _, _, spellID = UnitChannelInfo(unit)
         if name then
-            obj.channelInfo = {
-                name = name,
-                startTimeMs = startTimeMs,
-                endTimeMs = endTimeMs,
-                spellID = spellID,
-            }
+            local c = obj.channelInfo
+            if not c then
+                c = {}
+                obj.channelInfo = c
+            end
+            c.name = name
+            c.startTimeMs = startTimeMs
+            c.endTimeMs = endTimeMs
+            c.spellID = spellID
         else
             obj.channelInfo = nil
             Skippy.State.CastTargetName = nil
@@ -754,9 +882,23 @@ end
 -- 事件更新 玩家的施法目标
 function Skippy.UpdatePlayerCastTarget(name)
     Skippy.State.CastTargetName = name
-    for k, v in pairs(Skippy.Units) do
-        if type(v) == "table" and v.name == name then
-            Skippy.State.CastTargetUnit = k
+    Skippy.State.CastTargetUnit = nil
+    if not name then return end
+
+    local target = Skippy.Units.target
+    if target and target.name == name then
+        Skippy.State.CastTargetUnit = "target"
+        return
+    end
+    local focus = Skippy.Units.focus
+    if focus and focus.name == name then
+        Skippy.State.CastTargetUnit = "focus"
+        return
+    end
+    for unit, obj in pairs(Skippy.Units.Group) do
+        if type(obj) == "table" and obj.name == name then
+            Skippy.State.CastTargetUnit = unit
+            return
         end
     end
 end
@@ -799,45 +941,41 @@ end
 -- 事件更新 更新光环
 function Skippy.UpdateAuraInfo(unit, info)
     local obj = GetUnitObj(unit)
-    if obj then
-        if not obj.auras then
+    if not obj then return end
+
+    if info.isFullUpdate then
+        Skippy.UpdateAuraFull(unit)
+        return
+    end
+
+    if not obj.auras then
+        -- player 的 auras 与 State.auras 共享同一张表，增量更新只需写一处
+        if unit == "player" then
+            Skippy.State.auras = Skippy.State.auras or {}
+            obj.auras = Skippy.State.auras
+        else
             obj.auras = {}
         end
-        if info.isFullUpdate then
-            Skippy.UpdateAuraFull(unit)
-            return
-        end
+    end
 
-        if info.addedAuras then
-            for _, aura in pairs(info.addedAuras) do
-                obj.auras[aura.auraInstanceID] = aura
-                if unit == "player" then
-                    Skippy.State.auras[aura.auraInstanceID] = aura
-                end
+    if info.addedAuras then
+        for _, aura in pairs(info.addedAuras) do
+            obj.auras[aura.auraInstanceID] = aura
+        end
+    end
+
+    if info.updatedAuraInstanceIDs then
+        for _, id in pairs(info.updatedAuraInstanceIDs) do
+            local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
+            if aura then
+                obj.auras[id] = aura
             end
         end
+    end
 
-        if info.updatedAuraInstanceIDs then
-            for _, id in pairs(info.updatedAuraInstanceIDs) do
-                local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
-                if aura then
-                    obj.auras[id] = aura
-                    if unit == "player" then
-                        Skippy.State.auras[id] = aura
-                    end
-                end
-            end
-        end
-
-        if info.removedAuraInstanceIDs then
-            for _, id in pairs(info.removedAuraInstanceIDs) do
-                if obj.auras[id] then
-                    obj.auras[id] = nil
-                    if unit == "player" then
-                        Skippy.State.auras[id] = nil
-                    end
-                end
-            end
+    if info.removedAuraInstanceIDs then
+        for _, id in pairs(info.removedAuraInstanceIDs) do
+            obj.auras[id] = nil
         end
     end
 end
@@ -855,25 +993,24 @@ function Skippy.UpdateShapeshiftForm()
             end
         end
     end
+    updateGo()
 end
 
--- 事件更新 检测单位是否在视野内
-function Skippy.updateGroupInsight(unit)
-    if unit ~= "player" then return end
-    if Skippy.State.CastTargetUnit then
-        local obj = Skippy.Units[Skippy.State.CastTargetUnit]
-        if obj then
-            obj.inSight = false
-            if obj.inSightTimer then
-                obj.inSightTimer:Cancel()
-                obj.inSightTimer = nil
-            end
-            obj.inSightTimer = C_Timer.NewTimer(1, function()
-                obj.inSight = true
-                obj.inSightTimer = nil
-            end)
-        end
+-- 事件更新 标记当前施法目标暂时不在视野内（1 秒后恢复）
+-- 由调用方决定何时触发（玩家施法失败 / "目标不在视野中" 报错）
+function Skippy.updateGroupInsight()
+    local castTargetUnit = Skippy.State.CastTargetUnit
+    if not castTargetUnit then return end
+    local obj = GetUnitObj(castTargetUnit)
+    if not obj then return end
+    obj.inSight = false
+    if obj.inSightTimer then
+        obj.inSightTimer:Cancel()
     end
+    obj.inSightTimer = C_Timer.NewTimer(1, function()
+        obj.inSight = true
+        obj.inSightTimer = nil
+    end)
 end
 
 -- 事件更新 获取玩家天赋信息
@@ -921,8 +1058,9 @@ local groupUnitTimer
 local function updateGroupUnitNow()
     Skippy.Units.Group = {}
     for unit in WA_IterateGroupMembers() do
-        Skippy.GetUnitInfo(unit)
+        Skippy.GetUnitInfo(unit, true)
     end
+    Skippy.SyncUnitList()
 end
 
 local function runGroupUnitTrailing()
@@ -995,20 +1133,25 @@ aura_env.handlers = {
     end,
     PLAYER_DEAD = function()
         Skippy.State.isDead = UnitIsDeadOrGhost("player")
+        updateGo()
     end,
     PLAYER_ALIVE = function()
         Skippy.State.isDead = UnitIsDeadOrGhost("player")
+        updateGo()
     end,
     PLAYER_UNGHOST = function()
         Skippy.State.isDead = UnitIsDeadOrGhost("player")
+        updateGo()
     end,
     PLAYER_MOUNT_DISPLAY_CHANGED = function()
         Skippy.State.isMounted = IsMounted("player")
+        updateGo()
     end,
     UPDATE_STEALTH = function()
         Skippy.State.stealth = C_UnitAuras.GetPlayerAuraBySpellID(5215)
         Skippy.State.vanish = C_UnitAuras.GetPlayerAuraBySpellID(11327)
         Skippy.State.catStealth = Skippy.State.shapeshiftFormID == 1 and Skippy.State.stealth
+        updateGo()
     end,
 
     UNIT_HEALTH = function(unit)
@@ -1042,24 +1185,31 @@ aura_env.handlers = {
     end,
     UNIT_SPELLCAST_START = function(unit, castGUID, spellID, castBarID)
         Skippy.UpdateCastingInfo(unit)
+        isPlayerCastingMount(unit, spellID)
     end,
     UNIT_SPELLCAST_STOP = function(unit, castGUID, spellID, castBarID)
+        isPlayerStopCastingMount(unit)
         Skippy.UpdateCastingInfo(unit)
     end,
     UNIT_SPELLCAST_FAILED = function(unit, castGUID, spellID, castBarID)
+        isPlayerStopCastingMount(unit)
         if not spellID then return end
         Skippy.UpdateChannelingInfo(unit)
         Skippy.UpdateCastingInfo(unit)
-        Skippy.updateGroupInsight(unit)
+        if unit == "player" then
+            Skippy.updateGroupInsight()
+        end
         Skippy.UpdateFailedSpell(unit, spellID)
     end,
     UNIT_SPELLCAST_SUCCEEDED = function(unit, castGUID, spellID, castBarID)
+        isPlayerStopCastingMount(unit)
         if not spellID then return end
         Skippy.UpdateChannelingInfo(unit)
         Skippy.UpdateCastingInfo(unit)
         Skippy.UpdateInsertSpell(spellID)
     end,
     UNIT_SPELLCAST_INTERRUPTED = function(unit, castGUID, spellID, interruptedBy, castBarID)
+        isPlayerStopCastingMount(unit)
         Skippy.UpdateChannelingInfo(unit)
         Skippy.UpdateCastingInfo(unit)
     end,
@@ -1138,6 +1288,7 @@ Skippy.State.isDead = UnitIsDeadOrGhost("player")
 Skippy.State.CastTargetName = nil
 Skippy.State.CastTargetUnit = nil
 Skippy.State.hasMainHandEnchant = GetWeaponEnchantInfo()
+Skippy.State.isCastingMount = false
 
 Skippy.State.healthInfo = {}
 Skippy.State.power = {}
@@ -1158,13 +1309,17 @@ function Skippy.hookChatFrameEditBox()
         if editBox then
             editBox:HookScript("OnEditFocusGained", function()
                 Skippy.State.isChatOpen = true
+                updateGo()
             end)
             editBox:HookScript("OnEditFocusLost", function()
                 Skippy.State.isChatOpen = false
+                updateGo()
             end)
         end
     end
 end
+
+Skippy.hookChatFrameEditBox()
 
 function Skippy.CreateClassMacros(id)
     local config = classMacroConfig[id]
@@ -1194,7 +1349,6 @@ else
 end
 
 Skippy.GetUnitInfo("player")    -- 获取玩家信息
-Skippy.GetCharacterTalentInfo() -- 更新组单位信息
 Skippy.InitBossUnit()           -- 初始化Boss单位
 Skippy.GetCharacterTalentInfo() -- 获取角色天赋信息
 Skippy.GetSpellBookInfo()       -- 获取技能书信息
@@ -1202,6 +1356,7 @@ Skippy.GetGlyphInfo()           -- 获取Glyph信息
 Skippy.UpdateAllTotem()         -- 更新所有图腾信息
 Skippy.UpdateShapeshiftForm()   -- 更新玩家形态信息
 Skippy.UpdateGroupUnit()        -- 更新组单位信息
+getMountsInfo()                 -- 获取玩家坐骑信息
 
 --==============================================================================
 --  查找单位或数量的相关函数
@@ -1242,12 +1397,25 @@ local function getUnitAuraByName(unit, auraName, byPlayerOnly)
     return getUnitAura(unit, "name", auraName, byPlayerOnly)
 end
 
----@param unit string 单位名称，如：party1、raid2...
----@param spellId number 法术ID
----@param byPlayerOnly boolean 是否只返回玩家光环
----@return table|nil auraTable 光环信息
-local function getUnitAuraBySpellId(unit, spellId, byPlayerOnly)
-    return getUnitAura(unit, "spellId", spellId, byPlayerOnly)
+-- 获取目标身上指定光环（按名称或法术ID匹配）
+---@param auraKey string|number 光环名称或法术ID
+---@param byPlayerOnly boolean|nil 是否只取玩家施放的光环
+---@return table|nil 光环信息
+function Skippy.GetTargetAura(auraKey, byPlayerOnly)
+    local target = Skippy.Units.target
+    if not target or not target.auras then return nil end
+    for _, aura in pairs(target.auras) do
+        if (aura.name == auraKey or aura.spellId == auraKey)
+            and (not byPlayerOnly or aura.sourceUnit == "player") then
+            return aura
+        end
+    end
+    return nil
+end
+
+-- 获取目标身上由玩家施放的指定光环
+function Skippy.GetTargetAuraByPlayer(auraKey)
+    return Skippy.GetTargetAura(auraKey, true)
 end
 
 -- 创建光环名称集合
@@ -1292,14 +1460,27 @@ local function findLowestGroupUnit(predicate)
     return lowestUnit, lowestHealth, lowestAura
 end
 
--- 获取玩家光环
----@param auraName string 光环名称
----@param byPlayerOnly boolean 是否只返回玩家光环
+-- 获取玩家光环（按名称或法术ID匹配）
+---@param auraKey string|number 光环名称或法术ID
+---@param byPlayerOnly? boolean 是否只返回玩家施放的光环，默认 true
 ---@return table|nil auraTable 光环信息
-function Skippy.GetPlayerAuraByName(auraName, byPlayerOnly)
+function Skippy.GetPlayerAuraByName(auraKey, byPlayerOnly)
     if byPlayerOnly == nil then byPlayerOnly = true end
-    local aura = getUnitAuraByName("player", auraName, byPlayerOnly)
-    return aura
+    local auras = Skippy.State.auras
+    if not auras then return nil end
+    for _, aura in pairs(auras) do
+        if (aura.name == auraKey or aura.spellId == auraKey)
+            and (not byPlayerOnly or aura.sourceUnit == "player") then
+            return aura
+        end
+    end
+    return nil
+end
+
+-- 获取玩家单位对象（healthPercent / auras / power 等）
+---@return table|nil
+function Skippy.GetPlayerInfo()
+    return GetUnitObj("player")
 end
 
 ---获取当前施法剩余时间Ms
@@ -1325,6 +1506,17 @@ function Skippy.GetChannelingDuration(reversed)
     local duration = reversed and channelInfo.endTimeMs - currentTime * 1000 or
         channelInfo.startTimeMs - currentTime * 1000
     return duration > 0 and duration or nil
+end
+
+---判断当前施法是否已（接近）完成
+---@param margin number|nil 容差秒数：未施法或剩余时间 <= margin 时视为已完成
+---@return boolean
+function Skippy.IsFinishedCasting(margin)
+    margin = margin or 0
+    local castInfo = Skippy.State.castInfo
+    if not castInfo or not castInfo.endTimeMS then return true end
+    local remaining = castInfo.endTimeMS / 1000 - GetTime()
+    return remaining <= margin
 end
 
 ---判断单位是否可以协助
@@ -1419,6 +1611,55 @@ function Skippy.GetEnemyCountWithoutAura(range, auraName, hasAura, byPlayerOnly)
         end
     end
     return count
+end
+
+-- 攻击速度降低 / 攻强降低 减益名称集（坦克辅助用，原 tankhelper.lua 迁入）
+local attackSpeedSlowAuras = {
+    ["冰霜疫病"] = true,
+    ["雷霆一击"] = true,
+    ["正义审判"] = true,
+    ["感染伤口"] = true,
+}
+local attackPowerSlowAuras = {
+    ["挫志怒吼"] = true,
+    ["辩护"] = true,
+    ["挫志咆哮"] = true,
+    ["虚弱诅咒"] = true,
+}
+
+-- 统计 8 码内是否带有指定减益集的敌人数量（图腾 creatureID==11 除外）
+---@return number 无该减益的敌人数量
+---@return number 有该减益的敌人数量
+local function countNameplateSlow(slowSet)
+    local noCount, hasCount = 0, 0
+    for _, data in pairs(Skippy.Units.Nameplate) do
+        if data and data.exists and data.creatureID ~= 11 and data.auras
+            and data.maxRange and data.maxRange <= 8 then
+            local has = false
+            for _, aura in pairs(data.auras) do
+                if slowSet[aura.name] then
+                    has = true
+                    break
+                end
+            end
+            if has then
+                hasCount = hasCount + 1
+            else
+                noCount = noCount + 1
+            end
+        end
+    end
+    return noCount, hasCount
+end
+
+-- 攻击速度降低：返回 无减益数量, 有减益数量
+function Skippy.AttackSpeedSlow()
+    return countNameplateSlow(attackSpeedSlowAuras)
+end
+
+-- 攻强降低：返回 无减益数量, 有减益数量
+function Skippy.AttackPowerSlow()
+    return countNameplateSlow(attackPowerSlowAuras)
 end
 
 -- 友方
@@ -1520,10 +1761,10 @@ function Skippy.GetLowestUnitWithRoles(role1, role2, role3)
 end
 
 ---@param auraName string 光环名称，如："恢复"、"暗言术：痛"
----@param hasAura  boolean 是否包含光环（true: 有该光环的单位, false: 没有该光环的单位）, 默认是true
----@param byPlayerOnly boolean 是否只返回玩家施放的光环, 默认是true
----@param role string|nil 职责，如 "TANK", "HEALER", "DAMAGER"，传 nil 或 "" 表示不限职责
----@param hasRole boolean 是否包含该职责（true: 必须是该职责的单位, false: 排除该职责的单位）, 默认是true
+---@param hasAura?  boolean 是否包含光环（true: 有该光环的单位, false: 没有该光环的单位）, 默认是true
+---@param byPlayerOnly? boolean 是否只返回玩家施放的光环, 默认是true
+---@param role? string|nil 职责，如 "TANK", "HEALER", "DAMAGER"，传 nil 或 "" 表示不限职责
+---@param hasRole? boolean 是否包含该职责（true: 必须是该职责的单位, false: 排除该职责的单位）, 默认是true
 ---@return string|nil 生命值最低的单位
 ---@return number|nil 生命值百分比
 ---@return table|nil 光环信息
@@ -1542,7 +1783,7 @@ function Skippy.GetLowestUnitByAuraState(auraName, hasAura, byPlayerOnly, role, 
 end
 
 ---@param auraTable table 光环名称列表，如 { "恢复", "真言术：韧", "牺牲之手" }
----@param byPlayerOnly boolean 是否只返回玩家施放的光环，默认是 true
+---@param byPlayerOnly? boolean 是否只返回玩家施放的光环，默认是 true
 ---@return string|nil 生命值最低的单位
 ---@return number|nil 生命值百分比
 ---@return table|nil 光环信息（匹配到的第一个光环的详细数据表）
@@ -1573,7 +1814,7 @@ end
 ---@return string|nil 有指定驱散的单位
 function Skippy.GetUnitWithdispelName(dispelName)
     for unit, data in pairs(Skippy.Units.Group) do
-        if existsUnit(data) then
+        if existsUnit(data) and data.auras then
             for _, aura in pairs(data.auras) do
                 if aura.isHarmful and aura.dispelName == dispelName then
                     return unit

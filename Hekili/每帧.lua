@@ -7,10 +7,15 @@ function HEKILI(event, event_display, event_ability_id, indicator, empower_to)
 
     local channel = UnitChannelInfo("player")
 
-    local rec = HekiliDisplayPrimary.Recommendations[1]
+    local rec = HekiliDisplayPrimary and HekiliDisplayPrimary.Recommendations
+        and HekiliDisplayPrimary.Recommendations[1]
+    if not rec then
+        Wa1Key.Prop.HekiliCode = 0
+        return false
+    end
 
     local assistedID = C_AssistedCombat.GetNextCastSpell()
-    local keybind = aura_env.keymap[rec.keybind]
+    local keybind = aura_env.keymap and aura_env.keymap[rec.keybind]
 
     local waitTime = 1
 
@@ -23,7 +28,7 @@ function HEKILI(event, event_display, event_ability_id, indicator, empower_to)
             Wa1Key.Prop.HekiliCode = 254 -- 饰品
             return true
         end
-        if assistedID and aura_env.assisted[assistedID] then
+        if assistedID and aura_env.assisted and aura_env.assisted[assistedID] then
             Wa1Key.Prop.HekiliCode = 253 -- 一键辅助
             return true
         end

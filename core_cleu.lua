@@ -5,7 +5,6 @@ function CLEU(event, timestamp, subEvent, hideCaster, sourceGUID, sourceName, so
     if subEvent == "UNIT_DIED" then
         for k, v in pairs(Skippy.Units.Group) do
             if v.GUID == destGUID then
-                print(k)
                 v.isDead = UnitIsDeadOrGhost(k)
             end
         end

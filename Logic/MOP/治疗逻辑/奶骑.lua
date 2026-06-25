@@ -26,7 +26,10 @@ local HolyAvenger = playerAura("神圣复仇者", true)
 local SelflessAura = playerAura("无私治愈", true)
 
 -- ===== 逻辑 =====
-aura_env.txt = "测试位置"
+if not Skippy.Go then
+    aura_env.txt = "暂停"
+    return SendSpell(nil, nil)
+end
 -- [洞察圣印]未激活时使用[洞察圣印]
 if aura_env.SelflessHealer and not insight then
     aura_env.txt = "洞察圣印"
@@ -140,5 +143,5 @@ if state.isCombat and SpellOnUnit("十字军打击", "target") and target.canAtt
     aura_env.txt = "十字军打击"
     return SendSpell("target", "十字军打击")
 end
-aura_env.txt = "结束位置"
+aura_env.txt = "休息..."
 return SendSpell(nil, nil)

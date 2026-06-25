@@ -51,6 +51,8 @@
         "ClearOverrideBindings",
         "GetSpellTabInfo",
         "GetSpellBookItemInfo",
-        "BOOKTYPE_SPELL"
+        "BOOKTYPE_SPELL",
+        "Hekili_GetRecommendedAbility",
+        "C_MountJournal"
     ]
 }

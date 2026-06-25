@@ -1,71 +1,65 @@
-if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.UnitHeal then return end
+if not Skippy or not Skippy.Units or not Skippy.State or not Skippy.updateSpellIndex then return end
 if Skippy.State.class ~= "牧师" or Skippy.State.specID ~= 257 then return end
 if not Skippy.State.inParty then return end
-if not Skippy.Group or not Skippy.State.initialization then return Skippy.UnitHeal("Skip", "Skip") end
+if not Skippy.macrosReady then return Skippy.updateSpellIndex(nil, nil) end
 
-local currentTime = GetTime()
-local state = Skippy.State
-local castUnit = state.CastTargetUnit
-local group = Skippy.Group
+local SendSpell = Skippy.updateSpellIndex
 local playerAuras = Skippy.GetPlayerAuraByName
-local isKnown = Skippy.IsSpellKnown
-local spell = Skippy.GetSpellInfo
-local chakra_cooldown = aura_env.getChakraCooldown() -- 脉轮：罚, 佑, 静 ; 冷却时间
-local mana = Skippy.State.power.MANA[1]
-local manaMax = Skippy.State.power.MANA[2]
-local percentMana = mana / manaMax * 100
+local usable = Skippy.IsUsableSpell
+local player = Skippy.GetPlayerInfo()
+
 local lowestUnit, lowestHealth = Skippy.GetLowestUnit()
-local lowestUnitWithoutPlayer, lowestHealthWithoutPlayer = Skippy.GetLowestUnitWithoutPlayer()
-local noRenewTank, noRenewHealthTank = Skippy.GetUnitWithoutPlayerAurasAndRole("恢复", "TANK")
-local noRenewUnit, noRenewHealth = Skippy.GetLowestUnitWithoutPlayerAuras("恢复")
-local noMendingTank = Skippy.GetUnitWithoutPlayerAurasAndRole("愈合祷言", "TANK")
+local lowestUnitWithoutPlayer, lowestHealthWithoutPlayer = Skippy.GetLowestUnitWithoutUnit("player")
+local noRenewTank = Skippy.GetLowestUnitByAuraState("恢复", false, true, "TANK", true)
+local noRenewUnit, noRenewHealth = Skippy.GetLowestUnitByAuraState("恢复", false, true)
+local noMendingTank = Skippy.GetLowestUnitByAuraState("愈合祷言", false, true, "TANK", true)
 
 if not Skippy.IsFinishedCasting(0.4) then return end
 
-if spell("恢复").usable and noRenewTank then
-    return Skippy.UnitHeal(noRenewTank, "恢复")
+if usable("恢复") and noRenewTank then
+    return SendSpell(noRenewTank, "恢复")
 end
 
-if spell("神圣之星").usable and lowestUnit then
-    return Skippy.UnitHeal(lowestUnit, "神圣之星")
+if usable("神圣之星") and lowestUnit then
+    return SendSpell(lowestUnit, "神圣之星")
 end
 
-if spell("治疗之环").usable and Skippy.GetCount(90) >= 3 then
-    return Skippy.UnitHeal("spell", "治疗之环")
+if usable("治疗之环") and Skippy.GetGroupCount(90) >= 3 then
+    return SendSpell("spell", "治疗之环")
 end
 
-if spell(88684).usable and playerAuras("脉轮：静") and lowestHealth < 70 then
-    return Skippy.UnitHeal(lowestUnit, "圣言术：静")
+if usable(88684) and playerAuras("脉轮：静") and lowestHealth < 70 then
+    return SendSpell(lowestUnit, "圣言术：静")
 end
 
-if spell("联结治疗").usable and group.player.percentHealth < 70 and lowestHealthWithoutPlayer < 70 then
-    return Skippy.UnitHeal(lowestUnitWithoutPlayer, "联结治疗")
+if usable("联结治疗") and player and (player.healthPercent or 100) < 70 and lowestHealthWithoutPlayer < 70 then
+    return SendSpell(lowestUnitWithoutPlayer, "联结治疗")
 end
 
-if spell("强效治疗术").usable and lowestHealth < 70 then
+if usable("强效治疗术") and lowestHealth < 70 then
     if playerAuras("妙手回春") and playerAuras("妙手回春").applications == 2 then
-        return Skippy.UnitHeal(lowestUnit, "强效治疗术")
+        return SendSpell(lowestUnit, "强效治疗术")
     end
 end
 
-if spell("快速治疗").usable and lowestHealth < 70 then
-    return Skippy.UnitHeal(lowestUnit, "快速治疗")
+if usable("快速治疗") and lowestHealth < 70 then
+    return SendSpell(lowestUnit, "快速治疗")
 end
 
-if spell("愈合祷言").usable and noMendingTank then
-    return Skippy.UnitHeal(noMendingTank, "愈合祷言")
+if usable("愈合祷言") and noMendingTank then
+    return SendSpell(noMendingTank, "愈合祷言")
 end
 
-if spell("恢复").usable and noRenewHealth < 90 then
-    return Skippy.UnitHeal(noRenewUnit, "恢复")
+if usable("恢复") and noRenewHealth and noRenewHealth < 90 then
+    return SendSpell(noRenewUnit, "恢复")
 end
 
-if spell("强效治疗术").usable and lowestHealth < 60 then
-    return Skippy.UnitHeal(lowestUnit, "强效治疗术")
+if usable("强效治疗术") and lowestHealth < 60 then
+    return SendSpell(lowestUnit, "强效治疗术")
 end
 
-if spell("治疗术").usable and lowestHealth < 85 then
-    return Skippy.UnitHeal(lowestUnit, "治疗术")
+if usable("治疗术") and lowestHealth < 85 then
+    return SendSpell(lowestUnit, "治疗术")
 end
 
-return Skippy.UnitHeal("None", "None")
+return SendSpell(nil, nil)
