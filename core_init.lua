@@ -11,13 +11,14 @@ local tinsert = table.insert
 --==============================================================================
 Skippy.index = 0
 Skippy.iconID = nil
+Skippy.HekiliSpellName = nil
 Skippy.Go = true
 Skippy.SpellInfo = Skippy.SpellInfo or {}
 Skippy.SpellBook = Skippy.SpellBook or {}
 Skippy.GlyphInfo = Skippy.GlyphInfo or {}
 Skippy.TalentInfo = Skippy.TalentInfo or {}
 Skippy.InsertSpells = Skippy.InsertSpells or {}
-
+Skippy.Encounter = nil
 Skippy.State = {
     auras = {}
 }
@@ -105,12 +106,52 @@ local classMacroConfig = {
             { "荣耀圣令", "target" },
             { "圣洁护盾", "target" },
             { "圣光普照", "target" },
-            { "审判", "target" },
-            { "十字军打击", "target" },
-            { "黎明圣光", "target" },
+            { "黎明圣光" },
             { "洞察圣印" },
             { "神圣恳求" },
             { "神圣棱镜", "target" },
+            { "保护之手", "mouseover" },
+            { "制裁之拳", "target" },
+            { "公正圣印" },
+            { "力量祝福", "player" },
+            { "十字军打击", "target" },
+            { "圣佑术" },
+            { "圣光之速" },
+            { "圣殿骑士的裁决", "target" },
+            { "圣疗术", "player" },
+            { "圣盾术" },
+            { "复仇之怒" },
+            { "审判", "target" },
+            { "异端裁决" },
+            { "愤怒之锤", "target" },
+            { "拯救之手", "mouseover" },
+            { "正义之怒" },
+            { "正义之锤", "target" },
+            { "正义圣印" },
+            { "洞察圣印" },
+            { "清算", "target" },
+            { "牺牲之手", "mouseover" },
+            { "王者祝福", "player" },
+            { "盲目之光" },
+            { "真理圣印" },
+            { "神圣风暴" },
+            { "自由之手", "mouseover" },
+            { "虔诚光环" },
+            { "责难", "target" },
+            { "超度邪恶", "target" },
+            { "超脱" },
+            { "远古列王守卫" },
+            { "驱邪术", "target" },
+            { "圣光之锤", "player" },
+            { "处决宣判", "target" },
+            { "复仇者之盾", "target" },
+            { "奉献" },
+            { "奉献" },
+            { "正义盾击", "target" },
+            { "永恒之火", "player" },
+            { "炽热防御者" },
+            { "神圣复仇者" },
+            { "神圣愤怒" },
         },
     },
     -- 牧师 (classId 5)：戒律(256) + 神圣(257)
@@ -200,7 +241,9 @@ do
     local i = 1
     for _, m in ipairs(modifiers) do
         for _, k in ipairs(keys) do
-            macroKind[i] = m .. "-" .. k
+            local key = m .. "-" .. k
+            macroKind[i] = key
+            -- print(i, macroKind[i])
             i = i + 1
         end
     end
@@ -310,34 +353,66 @@ function Skippy.CreateMacros(unitSpellList, staticSpellList)
         end
         index = index + 1
     end
-    -- for spellName, data in pairs(Skippy.SpellMap) do
-    --     for unit, macroIndex in pairs(data) do
-    --         local keyBinding = macroKind[macroIndex]
-    --         print(spellName ..
-    --             " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
-    --     end
-    -- end
+    for spellName, data in pairs(Skippy.SpellMap) do
+        for unit, macroIndex in pairs(data) do
+            local keyBinding = macroKind[macroIndex]
+            print(spellName ..
+                " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
+        end
+    end
 end
 
 --==============================================================================
 --  函数集
 --==============================================================================
-function Skippy.updateSpellIndex(unit, spellName)
-    if not spellName or not Skippy.SpellMap or not Skippy.SpellMap[spellName] then
+function Skippy.updateSpellIndex(spellName, unit)
+    if not spellName then
         Skippy.iconID = nil
         Skippy.index = 0
-        return true
+        return false, "请输入技能"
+    end
+    if not Skippy.SpellMap then
+        Skippy.iconID = nil
+        Skippy.index = 0
+        return false, "没有宏列表"
+    end
+    if spellName == "暂停" then
+        Skippy.iconID = 134376
+        Skippy.index = 0
+        return true, "暂停"
+    end
+    if spellName == "休息" then
+        Skippy.iconID = 136090
+        Skippy.index = 0
+        return true, "休息"
+    end
+    if not Skippy.SpellMap[spellName] then
+        Skippy.iconID = nil
+        Skippy.index = 0
+        return false, "没有技能宏"
     end
     local spellInfo = Skippy.SpellInfo[spellName]
     if spellInfo then
         Skippy.iconID = spellInfo.spellInfo.iconID
     end
-    if unit and Skippy.SpellMap[spellName][unit] then
-        Skippy.index = Skippy.SpellMap[spellName][unit]
+    if unit then
+        local index = Skippy.SpellMap[spellName][unit]
+        if index then
+            Skippy.index = index
+            if unit == "spell" then
+                return true, "施放: " .. spellName
+            else
+                return true, "目标: " .. unit .. "\n施放:" .. spellName
+            end
+        end
     else
-        Skippy.index = Skippy.SpellMap[spellName]["spell"]
+        local index = Skippy.SpellMap[spellName]["spell"]
+        if index then
+            Skippy.index = index
+            return true, "施放: " .. spellName
+        end
     end
-    return true
+    return false, "没有技能宏"
 end
 
 -- 把单位归类到所属容器：返回 容器表, 键, 是否单例(target/focus)
@@ -481,6 +556,7 @@ end
 
 --  获取技能信息
 function Skippy.GetSpellInfo(spellIdentifier)
+    if not spellIdentifier then return nil end
     local name = C_Spell.GetSpellName(spellIdentifier)
     if not name then return nil end
     if Skippy.SpellInfo[name] then
@@ -547,6 +623,7 @@ end
 
 -- 判断技能是否可用
 function Skippy.IsUsableSpell(spellIdentifier)
+    if not spellIdentifier then return false end
     local spell = Skippy.GetSpellInfo(spellIdentifier)
     local gcd = getGCD()
     local cd = Skippy.GetSpellCooldown(spellIdentifier)
@@ -569,8 +646,26 @@ function Skippy.IsUsableSpellOnUnit(spellIdentifier, unit)
     if not spell or not isUsable or unit == nil then
         return false
     end
+    if not Skippy.SpellMap[spell.spellInfo.name] or not Skippy.SpellMap[spell.spellInfo.name][unit] then
+        return false
+    end
     local inSpellRange = C_Spell.IsSpellInRange(spellIdentifier, unit)
     return inSpellRange
+end
+
+-- 获取Hekili技能列表
+local hekiliList = {}
+function Skippy.GetHekiliSpellName(event_ability_id)
+    if not hekiliList[event_ability_id] then
+        local name = C_Spell.GetSpellName(event_ability_id)
+        if name then
+            hekiliList[event_ability_id] = name
+            return name
+        else
+            return nil
+        end
+    end
+    return hekiliList[event_ability_id]
 end
 
 -- 获取glyph信息
@@ -735,6 +830,7 @@ function Skippy.UpdateUnitInfo()
         local minRange, maxRange = WeakAuras.GetRange(unit)
         data.inRange = UnitInRange(unit)
         data.canAssist = UnitCanAssist("player", unit)
+        data.canAttack = UnitCanAttack("player", unit)
         data.minRange = minRange
         data.maxRange = maxRange
         if UnitIsUnit(unit, "player") then
@@ -1016,7 +1112,10 @@ end
 -- 事件更新 获取玩家天赋信息
 function Skippy.GetCharacterTalentInfo()
     Skippy.TalentInfo = {}
-
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
+    Skippy.State.specIndex = specIndex
+    Skippy.State.specID = specID
     local currentSpec = C_SpecializationInfo.GetSpecialization()
     if not currentSpec or currentSpec == 0 then
         return
@@ -1246,9 +1345,16 @@ aura_env.handlers = {
     end,
 
     ENCOUNTER_START = function(encounterID, encounterName, difficultyID, groupSize)
+        Skippy.Encounter = {
+            encounterID = encounterID,
+            encounterName = encounterName,
+            difficultyID = difficultyID,
+            groupSize = groupSize,
+        }
         Skippy.InitBossUnit()
     end,
     ENCOUNTER_END = function(encounterID, encounterName, difficultyID, groupSize, success)
+        Skippy.Encounter = nil
         Skippy.InitBossUnit()
     end,
     BOSS_KILL = function(encounterID, encounterName)

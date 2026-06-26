@@ -53,6 +53,7 @@
         "GetSpellBookItemInfo",
         "BOOKTYPE_SPELL",
         "Hekili_GetRecommendedAbility",
-        "C_MountJournal"
+        "C_MountJournal",
+        "HekiliDisplayPrimary"
     ]
 }
