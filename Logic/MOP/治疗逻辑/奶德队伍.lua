@@ -7,7 +7,7 @@ local currentTime = GetTime()
 local playerAuras = Skippy.GetPlayerAuraByName
 local spell = Skippy.IsUsableSpellOnUnit
 local usable = Skippy.IsUsableSpell
-local cd = Skippy.GetSpellCooldown
+local cd = Skippy.GetSpellCooldownDuration
 
 local lowestUnit, lowestHealth = Skippy.GetLowestUnit()
 local noLifebloomTank = Skippy.GetLowestUnitByAuraState("生命绽放", false, true, "TANK", true)

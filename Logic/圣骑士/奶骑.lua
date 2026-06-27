@@ -12,7 +12,6 @@ local holyPower = state.power.HOLY_POWER.powerValue
 local holyPowerMax = state.power.HOLY_POWER.powerMax
 
 -- ===== 变量 =====
-local SendSpell = Skippy.updateSpellIndex
 local SpellOnUnit = Skippy.IsUsableSpellOnUnit
 local Spell = Skippy.IsUsableSpell
 local playerAura = Skippy.GetPlayerAuraByName

@@ -98,72 +98,29 @@ local classMacroConfig = {
             "圣光普照",
         },
         static = {
-            { "清洁术", "target" },
-            { "圣光术", "target" },
-            { "圣光闪现", "target" },
-            { "神圣之光", "target" },
-            { "神圣震击", "target" },
-            { "荣耀圣令", "target" },
-            { "圣洁护盾", "target" },
-            { "圣光普照", "target" },
-            { "黎明圣光" },
-            { "洞察圣印" },
-            { "神圣恳求" },
-            { "神圣棱镜", "target" },
-            { "保护之手", "mouseover" },
-            { "制裁之拳", "target" },
-            { "公正圣印" },
-            { "力量祝福", "player" },
-            { "十字军打击", "target" },
-            { "圣佑术" },
-            { "圣光之速" },
-            { "圣殿骑士的裁决", "target" },
-            { "圣疗术", "player" },
-            { "圣盾术" },
-            { "复仇之怒" },
-            { "审判", "target" },
-            { "异端裁决" },
-            { "愤怒之锤", "target" },
-            { "拯救之手", "mouseover" },
-            { "正义之怒" },
-            { "正义之锤", "target" },
-            { "正义圣印" },
-            { "洞察圣印" },
-            { "清算", "target" },
-            { "牺牲之手", "mouseover" },
-            { "王者祝福", "player" },
-            { "盲目之光" },
-            { "真理圣印" },
-            { "神圣风暴" },
-            { "自由之手", "mouseover" },
-            { "虔诚光环" },
-            { "责难", "target" },
-            { "超度邪恶", "target" },
-            { "超脱" },
-            { "远古列王守卫" },
-            { "驱邪术", "target" },
-            { "圣光之锤", "player" },
-            { "处决宣判", "target" },
-            { "复仇者之盾", "target" },
-            { "奉献" },
-            { "奉献" },
-            { "正义盾击", "target" },
-            { "永恒之火", "player" },
-            { "炽热防御者" },
-            { "神圣复仇者" },
-            { "神圣愤怒" },
+            { "清洁术", "target" }, { "圣光术", "target" }, { "圣光闪现", "target" }, { "神圣之光", "target" }, { "神圣震击", "target" },
+            { "荣耀圣令", "target" }, { "圣洁护盾", "target" }, { "圣光普照", "target" }, { "黎明圣光" }, { "洞察圣印" },
+            { "神圣恳求" }, { "神圣棱镜", "target" }, { "保护之手", "mouseover" }, { "制裁之拳", "target" }, { "公正圣印" },
+            { "力量祝福", "player" }, { "十字军打击", "target" }, { "圣佑术" }, { "圣光之速" }, { "圣殿骑士的裁决", "target" },
+            { "圣疗术", "player" }, { "圣盾术" }, { "复仇之怒" }, { "审判", "target" }, { "异端裁决" },
+            { "愤怒之锤", "target" }, { "拯救之手", "mouseover" }, { "正义之怒" }, { "正义之锤", "target" }, { "正义圣印" },
+            { "洞察圣印" }, { "清算", "target" }, { "牺牲之手", "mouseover" }, { "王者祝福", "player" }, { "盲目之光" },
+            { "真理圣印" }, { "神圣风暴" }, { "自由之手", "mouseover" }, { "虔诚光环" }, { "责难", "target" },
+            { "超度邪恶", "target" }, { "超脱" }, { "远古列王守卫" }, { "驱邪术", "target" }, { "圣光之锤", "player" },
+            { "处决宣判", "target" }, { "复仇者之盾", "target" }, { "奉献" }, { "奉献" }, { "正义盾击", "target" },
+            { "永恒之火", "player" }, { "炽热防御者" }, { "神圣复仇者" }, { "神圣愤怒" },
         },
     },
     -- 牧师 (classId 5)：戒律(256) + 神圣(257)
     [5] = {
         unit = {
-            "恢复", "真言术：盾", "苦修", "愈合祷言", "治疗术",
-            "联结治疗", "强效治疗术", "快速治疗", "神圣之星", "圣言术：静",
+            "纯净术", "恢复", "真言术：盾", "苦修", "愈合祷言", "治疗术",
+            "联结治疗", "强效治疗术", "快速治疗", "圣言术：静",
         },
         static = {
             { "绝望祷言" }, { "心灵专注" }, { "治疗祷言" }, { "天使长" },
             { "暗影魔", "target" }, { "神圣之火", "target" }, { "惩击", "target" },
-            { "治疗之环" },
+            { "治疗之环", "player" },
         },
     },
     -- 萨满祭司 (classId 7)：恢复(264)
@@ -353,13 +310,13 @@ function Skippy.CreateMacros(unitSpellList, staticSpellList)
         end
         index = index + 1
     end
-    for spellName, data in pairs(Skippy.SpellMap) do
-        for unit, macroIndex in pairs(data) do
-            local keyBinding = macroKind[macroIndex]
-            print(spellName ..
-                " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
-        end
-    end
+    -- for spellName, data in pairs(Skippy.SpellMap) do
+    --     for unit, macroIndex in pairs(data) do
+    --         local keyBinding = macroKind[macroIndex]
+    --         print(spellName ..
+    --  " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
+    --     end
+    -- end
 end
 
 --==============================================================================
@@ -457,14 +414,14 @@ end
 -- 获取单位对象
 local function GetUnitObj(unit)
     local container, key = classifyUnit(unit)
-    if not container then return nil end
+    if not container or not key then return nil end
     return container[key]
 end
 
 -- 确保单位对象
 local function EnsureUnitObj(unit)
     local container, key = classifyUnit(unit)
-    if not container then return nil end
+    if not container or not key then return nil end
     local obj = container[key]
     if not obj then
         obj = {}
@@ -475,7 +432,7 @@ end
 
 local function ClearUnitObj(unit)
     local container, key, singleton = classifyUnit(unit)
-    if not container then return end
+    if not container or not key then return end
     if singleton then
         container[key] = {}
     else
@@ -603,7 +560,7 @@ local function getGCD()
 end
 
 -- 获取技能冷却
-function Skippy.GetSpellCooldown(spellIdentifier)
+function Skippy.GetSpellCooldownDuration(spellIdentifier)
     local spell = Skippy.GetSpellInfo(spellIdentifier)
     if not spell then return nil end
     local cooldowninfo = spell.cooldownInfo
@@ -626,7 +583,7 @@ function Skippy.IsUsableSpell(spellIdentifier)
     if not spellIdentifier then return false end
     local spell = Skippy.GetSpellInfo(spellIdentifier)
     local gcd = getGCD()
-    local cd = Skippy.GetSpellCooldown(spellIdentifier)
+    local cd = Skippy.GetSpellCooldownDuration(spellIdentifier)
     local isUsable = C_Spell.IsSpellUsable(spellIdentifier)
     if not spell or not cd then return false end
     local cooldownInfo = spell.cooldownInfo
@@ -1822,9 +1779,9 @@ end
 --     for unit, data in pairs(Skippy.Units) do
 --         local healthPercent = data.healthPercent
 --         if existsUnit(data) and data.subgroup == sub then
---             if healthPercent < healthThreshold then
---                 count = count + 1
---             end
+--  if healthPercent < healthThreshold then
+--      count = count + 1
+--  end
 --         end
 --     end
 --     return count

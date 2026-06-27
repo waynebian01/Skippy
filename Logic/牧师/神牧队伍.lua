@@ -25,7 +25,7 @@ if usable("神圣之星") and lowestUnit then
 end
 
 if usable("治疗之环") and Skippy.GetGroupCount(90) >= 3 then
-    return SendSpell("spell", "治疗之环")
+    return SendSpell("player", "治疗之环")
 end
 
 if usable(88684) and playerAuras("脉轮：静") and lowestHealth < 70 then
