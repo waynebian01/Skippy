@@ -231,6 +231,7 @@ local classSpecMacroConfig = {
                 { "心灵尖啸" },
                 { "心灵意志" },
                 { "惩击", "target" },
+                { "暗影魔", "target" },
                 { "摧心魔", "target" },
                 { "暗言术：灭", "target" },
                 { "暗言术：痛", "target" },
@@ -432,9 +433,9 @@ function Skippy.updateSpellIndex(spellName, unit)
     if not Skippy.SpellMap[spellName] then
         Skippy.iconID = nil
         Skippy.index = 0
-        return false, "没有技能宏"
+        return false, "没有技能宏: " .. spellName
     end
-    local spellInfo = Skippy.SpellInfo[spellName]
+    local spellInfo = Skippy.GetSpellInfo(spellName)
     if spellInfo then
         Skippy.iconID = spellInfo.spellInfo.iconID
     end
@@ -455,30 +456,58 @@ function Skippy.updateSpellIndex(spellName, unit)
             return true, "施放: " .. spellName
         end
     end
-    return false, "没有技能宏"
+    return false, "没有技能宏: " .. spellName
+end
+
+local insertSpellTimer
+
+local function clearInsertSpell()
+    Skippy.InsertSpell = nil
+    Skippy.InsertTarget = nil
+    if insertSpellTimer then
+        insertSpellTimer:Cancel()
+        insertSpellTimer = nil
+    end
+end
+
+local function insertSpell(spellName, unit)
+    if insertSpellTimer then
+        insertSpellTimer:Cancel()
+    end
+    Skippy.InsertSpell = spellName
+    Skippy.InsertTarget = unit
+    insertSpellTimer = C_Timer.NewTimer(2, function()
+        insertSpellTimer = nil
+        Skippy.InsertSpell = nil
+        Skippy.InsertTarget = nil
+    end)
 end
 
 ---@param spellName string
 ---@param unit string
 function Skippy.InsertSpellByNameAndUnit(spellName, unit)
-    if spellName and Skippy.SpellMap[spellName] then
-        if unit then
-            local index = Skippy.SpellMap[spellName][unit]
-            if index then
-                Skippy.InsertSpell = spellName
-                Skippy.InsertTarget = unit
-                print(Skippy.InsertSpell, Skippy.InsertTarget)
-                return true
-            end
+    if unit then
+        local usable = Skippy.IsUsableSpellOnUnit(spellName, unit)
+        if usable then
+            insertSpell(spellName, unit)
+            return true
+        end
+    else
+        local usable = Skippy.IsUsableSpell(spellName)
+        if usable then
+            insertSpell(spellName, nil)
+            return true
         end
     end
 end
 
-_G["Skippy_InsertSpell"] = function(spellName, unit)
-    print(spellName, unit)
+function Skippy.InsertSpellSucceeded(spellID)
+    if not Skippy.InsertSpell then return end
+    local spellName = C_Spell.GetSpellName(spellID)
+    if Skippy.InsertSpell == spellName then
+        clearInsertSpell()
+    end
 end
-
-print("全局函数是否存在:", _G["Skippy_InsertSpell"] ~= nil)
 
 -- 把单位归类到所属容器：返回 容器表, 键, 是否单例(target/focus)
 -- 单例存放在 Skippy.Units 顶层、清理时重置为空表；其余存放在对应子表、清理时移除
@@ -597,16 +626,21 @@ function Skippy.InitBossUnit()
     Skippy.SyncUnitList()
 end
 
-local function addSpellInfo(spellName)
-    local spellInfo = C_Spell.GetSpellInfo(spellName)
-    local cooldownInfo = C_Spell.GetSpellCooldown(spellName)
-    local chargeInfo = C_Spell.GetSpellCharges(spellName)
-    local isUsable, sufficientPower = C_Spell.IsSpellUsable(spellName)
-    local castCount = C_Spell.GetSpellCastCount(spellName)
-    local isHarmful = C_Spell.IsSpellHarmful(spellName)
-    local isHelpful = C_Spell.IsSpellHelpful(spellName)
-    local isPassive = C_Spell.IsSpellPassive(spellName)
-    Skippy.SpellInfo[spellName] = {
+local function addSpellInfo(spellIdentifier)
+    local spellInfo = C_Spell.GetSpellInfo(spellIdentifier)
+    if not spellInfo or not spellInfo.spellID then
+        return nil
+    end
+
+    local spellID = spellInfo.spellID
+    local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+    local chargeInfo = C_Spell.GetSpellCharges(spellID)
+    local isUsable, sufficientPower = C_Spell.IsSpellUsable(spellID)
+    local castCount = C_Spell.GetSpellCastCount(spellID)
+    local isHarmful = C_Spell.IsSpellHarmful(spellID)
+    local isHelpful = C_Spell.IsSpellHelpful(spellID)
+    local isPassive = C_Spell.IsSpellPassive(spellID)
+    Skippy.SpellInfo[spellID] = {
         spellInfo = spellInfo,
         cooldownInfo = cooldownInfo,
         chargeInfo = chargeInfo,
@@ -617,18 +651,19 @@ local function addSpellInfo(spellName)
         isHelpful = isHelpful,
         isPassive = isPassive,
     }
+    return Skippy.SpellInfo[spellID]
 end
 
 --  获取技能信息
 function Skippy.GetSpellInfo(spellIdentifier)
     if not spellIdentifier then return nil end
-    local name = C_Spell.GetSpellName(spellIdentifier)
-    if not name then return nil end
-    if Skippy.SpellInfo[name] then
-        return Skippy.SpellInfo[name]
+    local spellInfo = C_Spell.GetSpellInfo(spellIdentifier)
+    if not spellInfo or not spellInfo.spellID then return nil end
+    local spellID = spellInfo.spellID
+    if Skippy.SpellInfo[spellID] then
+        return Skippy.SpellInfo[spellID]
     else
-        addSpellInfo(name)
-        return Skippy.SpellInfo[name]
+        return addSpellInfo(spellID)
     end
 end
 
@@ -923,9 +958,9 @@ end
 
 -- 事件更新 技能充能
 function Skippy.UpdateSpellCharges()
-    for spellName, spellData in pairs(Skippy.SpellInfo) do
+    for spellID, spellData in pairs(Skippy.SpellInfo) do
         if spellData.chargeInfo then
-            spellData.chargeInfo = C_Spell.GetSpellCharges(spellName)
+            spellData.chargeInfo = C_Spell.GetSpellCharges(spellID)
         end
     end
 end
@@ -1227,6 +1262,14 @@ end
 --==============================================================================
 
 aura_env.handlers = {
+    SKIPPY_INSERT_SPELL = function(spellName, unit)
+        local ok = Skippy.InsertSpellByNameAndUnit(spellName, unit)
+        if ok then
+            print("正在插入技能: " .. spellName .. " 到 " .. unit)
+        else
+            print("插入技能失败: " .. spellName .. " 到 " .. unit)
+        end
+    end,
     PLAYER_ENTERING_WORLD = function(isInitialLogin, isReloadingUi)
         Skippy.GetSpellBookInfo()
     end,
@@ -1353,6 +1396,7 @@ aura_env.handlers = {
         if not spellID then return end
         Skippy.UpdateChannelingInfo(unit)
         Skippy.UpdateCastingInfo(unit)
+        Skippy.InsertSpellSucceeded(spellID)
     end,
     UNIT_SPELLCAST_INTERRUPTED = function(unit, castGUID, spellID, interruptedBy, castBarID)
         isPlayerStopCastingMount(unit)

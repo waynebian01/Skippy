@@ -10,15 +10,15 @@ local cd = Skippy.GetSpellCooldownDuration
 local state = Skippy.State
 local target = Skippy.Units.target
 local targetInRange = C_Spell.IsSpellInRange(585, "target")
-local targetCanAttack = target.exists and target.canAttack and targetInRange
+local targetCanAttack = target.canAttack and targetInRange
 local playerRealHealthPercent = Skippy.State.healthInfo.realHealthPercent
 
 local channel = state.channelInfo
 local percentMana = state.power.MANA.powerPercent
 
 local lowestUnit, lowestHealth = Skippy.GetLowestUnit()
-local noShieldUnit, noShieldHealth = Skippy.GetLowestUnitByAuraState("虚弱灵魂", false, true)
-local noShieldTank = Skippy.GetLowestUnitByAuraState("虚弱灵魂", false, true, "TANK", true)
+local noShieldUnit, noShieldHealth = Skippy.GetLowestUnitByAuraState("虚弱灵魂", false, false)
+local noShieldTank = Skippy.GetLowestUnitByAuraState("虚弱灵魂", false, false, "TANK", true)
 local noMendingTank = Skippy.GetLowestUnitByAuraState("愈合祷言", false, true, "TANK", true)
 
 -- ===== 逻辑 =====
@@ -28,6 +28,13 @@ end
 
 if channel then
     return aura_env.SendSpell("暂停")
+end
+
+if Skippy.InsertSpell then
+    if Skippy.InsertTarget then
+        return aura_env.SendSpell(Skippy.InsertSpell, Skippy.InsertTarget)
+    end
+    return aura_env.SendSpell(Skippy.InsertSpell, "spell")
 end
 
 if usable("绝望祷言") and playerRealHealthPercent < 40 then
@@ -42,7 +49,7 @@ if SpellOnUnit("真言术：盾", noShieldUnit) and noShieldHealth < 60 then
     return aura_env.SendSpell("真言术：盾", noShieldUnit)
 end
 
-if playerAuras("灵魂护壳") then -- 109964 灵魂护壳
+if playerAuras(109964) then --  灵魂护壳
     if playerAuras("福音传播") and playerAuras("福音传播").applications == 5 then
         return aura_env.SendSpell("天使长", "spell")
     end
@@ -56,14 +63,16 @@ if SpellOnUnit("愈合祷言", noMendingTank) then
     return aura_env.SendSpell("愈合祷言", noMendingTank)
 end
 
-if state.isCombat and targetCanAttack then
-    if isKnown(123040) then
-        if SpellOnUnit("摧心魔", "target") and percentMana < 80 then
-            return aura_env.SendSpell("暗影魔", "target")
-        end
-    else
-        if SpellOnUnit("暗影魔", "target") and percentMana < 80 then
-            return aura_env.SendSpell("暗影魔", "target")
+if state.isCombat then
+    if percentMana < 88 then
+        if isKnown(123040) then
+            if SpellOnUnit("摧心魔", "target") then
+                return aura_env.SendSpell("摧心魔", "target")
+            end
+        else
+            if SpellOnUnit("暗影魔", "target") then
+                return aura_env.SendSpell("暗影魔", "target")
+            end
         end
     end
 
