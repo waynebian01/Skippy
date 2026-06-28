@@ -49,7 +49,7 @@ if playerAuras("灵魂护壳") then -- 109964 灵魂护壳
     if usable("心灵专注") and not playerAuras("心灵专注") then
         return aura_env.SendSpell("心灵专注", "spell")
     end
-    return aura_env.SendSpell("治疗祷言", "spell")
+    return aura_env.SendSpell("治疗祷言", "player")
 end
 
 if SpellOnUnit("愈合祷言", noMendingTank) then

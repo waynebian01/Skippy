@@ -54,6 +54,7 @@
         "BOOKTYPE_SPELL",
         "Hekili_GetRecommendedAbility",
         "C_MountJournal",
-        "HekiliDisplayPrimary"
+        "HekiliDisplayPrimary",
+        "SlashCmdList"
     ]
 }

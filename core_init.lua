@@ -17,7 +17,8 @@ Skippy.SpellInfo = Skippy.SpellInfo or {}
 Skippy.SpellBook = Skippy.SpellBook or {}
 Skippy.GlyphInfo = Skippy.GlyphInfo or {}
 Skippy.TalentInfo = Skippy.TalentInfo or {}
-Skippy.InsertSpells = Skippy.InsertSpells or {}
+Skippy.InsertSpell = nil
+Skippy.InsertTarget = nil
 Skippy.Encounter = nil
 Skippy.State = {
     auras = {}
@@ -179,6 +180,7 @@ Skippy.SpellMap = {}
 local macroText = {}
 local macroList = {}
 local macroKind = {}
+local macroBindingOwner = CreateFrame("Frame", "SkippyMacroBindingOwner", UIParent)
 local modifiers = {
     "CTRL", "ALT", "SHIFT",
     "ALT-CTRL", "ALT-SHIFT", "CTRL-SHIFT",
@@ -208,6 +210,92 @@ end
 
 local UNITS_PER_SPELL = 25
 
+local classSpecMacroConfig = {
+    [5] = {
+        [256] = {
+            unit = {
+                "纯净术",
+                "治疗术",
+                "强效治疗术",
+                "快速治疗",
+                "恢复",
+                "真言术：盾",
+                "苦修",
+                "愈合祷言",
+            },
+            static = {
+                { "天使长" },
+                { "希望圣歌" },
+                { "心灵专注" },
+                { "心灵之火" },
+                { "心灵尖啸" },
+                { "心灵意志" },
+                { "惩击", "target" },
+                { "摧心魔", "target" },
+                { "暗言术：灭", "target" },
+                { "暗言术：痛", "target" },
+                { "束缚亡灵", "target" },
+                { "治疗祷言", "player" },
+                { "渐隐术" },
+                { "漂浮术", "target" },
+                { "灵魂护壳" },
+                { "痛苦压制", "target" },
+                { "痛苦压制", "mouseover" },
+                { "真言术：障", "cursor" },
+                { "真言术：韧", "player" },
+                { "神圣之火", "target" },
+                { "精神灼烧", "target" },
+                { "绝望祷言" },
+                { "群体驱散", "mouseover" },
+                { "联结治疗", "target" },
+                { "苦修", "target" },
+                { "虚空触须" },
+                { "防护恐惧结界", "target" },
+                { "驱散魔法", "target" },
+            },
+        },
+        [257] = classMacroConfig[5],
+        [258] = {
+            unit = {
+                "恢复", "真言术：盾", "苦修", "愈合祷言", "治疗术",
+                "联结治疗", "强效治疗术", "快速治疗", "圣言术：静",
+            },
+            static = {
+                { "绝望祷言" }, { "心灵专注" }, { "治疗祷言" }, { "天使长" },
+                { "暗影魔", "target" }, { "神圣之火", "target" }, { "惩击", "target" },
+                { "治疗之环", "player" },
+            },
+        },
+    },
+    [7] = {
+        [264] = classMacroConfig[7],
+    },
+    [10] = {
+        [270] = classMacroConfig[10],
+    },
+    [11] = {
+        [105] = classMacroConfig[11],
+    },
+}
+
+local function getClassMacroConfig(classId, specID)
+    local specConfig = classSpecMacroConfig[classId]
+    if specConfig then
+        return specConfig[specID] or specConfig.default
+    end
+    return classMacroConfig[classId]
+end
+
+local function clearClassMacroBindings()
+    ClearOverrideBindings(macroBindingOwner)
+    Skippy.SpellMap = {}
+    wipe(macroText)
+
+    for _, btn in pairs(macroList) do
+        btn:SetAttribute("macrotext", nil)
+    end
+end
+
 local function createMacro(name, key, macro)
     if InCombatLockdown() then
         -- 实际应用中，建议在这里注册一个 PLAYER_REGEN_ENABLED 事件，等出战后再自动调用一次
@@ -220,15 +308,13 @@ local function createMacro(name, key, macro)
         btn:SetAttribute("type", "macro")
         btn:RegisterForClicks("AnyUp", "AnyDown")
         macroList[name] = btn
-        SetOverrideBindingClick(UIParent, false, key, name, "LeftButton")
     end
 
     btn:SetAttribute("macrotext", macro)
     macroText[name] = macro
 
     if key and key ~= "" then
-        ClearOverrideBindings(btn)
-        SetOverrideBindingClick(UIParent, false, key, btn:GetName(), "LeftButton")
+        SetOverrideBindingClick(macroBindingOwner, false, key, btn:GetName(), "LeftButton")
     end
 end
 
@@ -314,7 +400,7 @@ function Skippy.CreateMacros(unitSpellList, staticSpellList)
     --     for unit, macroIndex in pairs(data) do
     --         local keyBinding = macroKind[macroIndex]
     --         print(spellName ..
-    --  " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
+    --             " - " .. unit .. " - " .. macroIndex .. " - " .. keyBinding .. " - " .. macroText["s" .. macroIndex])
     --     end
     -- end
 end
@@ -371,6 +457,28 @@ function Skippy.updateSpellIndex(spellName, unit)
     end
     return false, "没有技能宏"
 end
+
+---@param spellName string
+---@param unit string
+function Skippy.InsertSpellByNameAndUnit(spellName, unit)
+    if spellName and Skippy.SpellMap[spellName] then
+        if unit then
+            local index = Skippy.SpellMap[spellName][unit]
+            if index then
+                Skippy.InsertSpell = spellName
+                Skippy.InsertTarget = unit
+                print(Skippy.InsertSpell, Skippy.InsertTarget)
+                return true
+            end
+        end
+    end
+end
+
+_G["Skippy_InsertSpell"] = function(spellName, unit)
+    print(spellName, unit)
+end
+
+print("全局函数是否存在:", _G["Skippy_InsertSpell"] ~= nil)
 
 -- 把单位归类到所属容器：返回 容器表, 键, 是否单例(target/focus)
 -- 单例存放在 Skippy.Units 顶层、清理时重置为空表；其余存放在对应子表、清理时移除
@@ -956,41 +1064,6 @@ function Skippy.UpdatePlayerCastTarget(name)
     end
 end
 
--- 事件更新 更新玩家失败法术
-function Skippy.UpdateFailedSpell(unit, spellID)
-    local spellname = C_Spell.GetSpellName(spellID)
-    local castTarget = Skippy.State.CastTargetUnit
-    if Skippy.InsertSpells[spellname] or Skippy.InsertSpells[spellID] then
-        if Skippy.Units[castTarget] then
-            local spellIsUsable = Skippy.IsUsableSpellOnUnit(spellID, castTarget)
-            Skippy.InsertSpell = spellID
-            Skippy.InsertTarget = castTarget
-            if spellIsUsable then
-                C_Timer.After(1.5, function()
-                    Skippy.InsertSpell = nil
-                    Skippy.InsertTarget = nil
-                end)
-            end
-        else
-            local spellIsUsable = Skippy.IsUsableSpell(spellID)
-            Skippy.InsertSpell = spellID
-            if spellIsUsable then
-                C_Timer.After(1.5, function()
-                    Skippy.InsertSpell = nil
-                end)
-            end
-        end
-    end
-end
-
--- 事件更新 更新玩家失败法术
-function Skippy.UpdateInsertSpell(spellID)
-    if Skippy.InsertSpell and Skippy.InsertSpell == spellID then
-        Skippy.InsertSpell = nil
-        Skippy.InsertTarget = nil
-    end
-end
-
 -- 事件更新 更新光环
 function Skippy.UpdateAuraInfo(unit, info)
     local obj = GetUnitObj(unit)
@@ -1170,7 +1243,26 @@ aura_env.handlers = {
         Skippy.State.isCombat = false
     end,
     PLAYER_TALENT_UPDATE = function()
+        local previousSpecID = Skippy.State.specID
         Skippy.GetCharacterTalentInfo()
+        if previousSpecID ~= Skippy.State.specID then
+            Skippy.RebuildClassMacros()
+        end
+    end,
+    PLAYER_SPECIALIZATION_CHANGED = function(unit)
+        if unit and unit ~= "player" then return end
+        local previousSpecID = Skippy.State.specID
+        Skippy.GetCharacterTalentInfo()
+        if previousSpecID ~= Skippy.State.specID then
+            Skippy.RebuildClassMacros()
+        end
+    end,
+    ACTIVE_TALENT_GROUP_CHANGED = function()
+        local previousSpecID = Skippy.State.specID
+        Skippy.GetCharacterTalentInfo()
+        if previousSpecID ~= Skippy.State.specID then
+            Skippy.RebuildClassMacros()
+        end
     end,
     PLAYER_TOTEM_UPDATE = function(totemSlot)
         Skippy.UpdateTotem(totemSlot)
@@ -1255,14 +1347,12 @@ aura_env.handlers = {
         if unit == "player" then
             Skippy.updateGroupInsight()
         end
-        Skippy.UpdateFailedSpell(unit, spellID)
     end,
     UNIT_SPELLCAST_SUCCEEDED = function(unit, castGUID, spellID, castBarID)
         isPlayerStopCastingMount(unit)
         if not spellID then return end
         Skippy.UpdateChannelingInfo(unit)
         Skippy.UpdateCastingInfo(unit)
-        Skippy.UpdateInsertSpell(spellID)
     end,
     UNIT_SPELLCAST_INTERRUPTED = function(unit, castGUID, spellID, interruptedBy, castBarID)
         isPlayerStopCastingMount(unit)
@@ -1385,7 +1475,9 @@ end
 Skippy.hookChatFrameEditBox()
 
 function Skippy.CreateClassMacros(id)
-    local config = classMacroConfig[id]
+    local specID = Skippy.State.specID
+    local config = getClassMacroConfig(id, specID)
+    clearClassMacroBindings()
     if not config then
         Skippy.macrosReady = false
         return false
@@ -1400,13 +1492,31 @@ local function initClassMacros()
     WeakAuras.ScanEvents("SKIPPY_INIT_COMPLETE")
 end
 
+local macroInitFrame = CreateFrame("Frame")
+local macroInitPending = false
+
+macroInitFrame:SetScript("OnEvent", function(self)
+    macroInitPending = false
+    initClassMacros()
+    self:UnregisterAllEvents()
+end)
+
+function Skippy.RebuildClassMacros()
+    if InCombatLockdown() then
+        Skippy.macrosReady = false
+        if not macroInitPending then
+            macroInitPending = true
+            macroInitFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+        end
+        return false
+    end
+
+    initClassMacros()
+    return true
+end
+
 if InCombatLockdown() then
-    local macroInitFrame = CreateFrame("Frame")
-    macroInitFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-    macroInitFrame:SetScript("OnEvent", function(self)
-        initClassMacros()
-        self:UnregisterAllEvents()
-    end)
+    Skippy.RebuildClassMacros()
 else
     initClassMacros()
 end
